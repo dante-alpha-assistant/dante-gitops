@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue-dashboard
+  namespace: infra
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: queue-dashboard
+  template:
+    metadata:
+      labels:
+        app: queue-dashboard
+    spec:
+      containers:
+        - name: dashboard
+          image: ghcr.io/dante-alpha-assistant/queue-dashboard:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: REDIS_URL
+              value: "redis://redis.infra.svc.cluster.local:6379"
+            - name: PORT
+              value: "3000"
+            - name: NODE_ENV
+              value: "production"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      imagePullSecrets:
+        - name: ghcr-secret
