@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dante-id
+  namespace: dante
+spec:
+  selector:
+    app: dante-id
+  ports:
+    - port: 80
+      targetPort: 3001
+      protocol: TCP

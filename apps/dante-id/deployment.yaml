@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dante-id
+  namespace: dante
+  labels:
+    app: dante-id
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dante-id
+  template:
+    metadata:
+      labels:
+        app: dante-id
+    spec:
+      containers:
+        - name: dante-id
+          image: ghcr.io/dante-alpha-assistant/dante-id-landing:latest
+          ports:
+            - containerPort: 3001
+          envFrom:
+            - secretRef:
+                name: dante-id-env
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /api/platform/health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/platform/health
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 30
+      imagePullSecrets:
+        - name: ghcr-secret
