@@ -3,15 +3,6 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
-  - neo/pvc.yaml
-  - neo/configmap.yaml
-  - neo/deployment.yaml
-  - neo/service.yaml
-  - mu/pvc.yaml
-  - mu/configmap.yaml
-  - mu/deployment.yaml
-  - mu/service.yaml
-  - beta/pvc.yaml
-  - beta/configmap.yaml
-  - beta/deployment.yaml
-  - beta/service.yaml
+  - neo/
+  - mu/
+  - beta/
