@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-dispatcher
+  namespace: infra
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: task-dispatcher
+  template:
+    metadata:
+      labels:
+        app: task-dispatcher
+    spec:
+      containers:
+        - name: dispatcher
+          image: ghcr.io/dante-alpha-assistant/task-dispatcher:latest
+          imagePullPolicy: Always
+          env:
+            - name: SUPABASE_URL
+              value: "https://lessxkxujvcmublgwdaa.supabase.co"
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI"
+            - name: NEO_HOOKS_TOKEN
+              value: "neo-hooks-tok-2026"
+            - name: MU_HOOKS_TOKEN
+              value: "mu-hooks-tok-2026"
+            - name: BETA_HOOKS_TOKEN
+              value: "beta-hooks-tok-2026"
+            - name: NEO_HOOKS_URL
+              value: "http://neo.agents.svc.cluster.local:18789/hooks/agent"
+            - name: MU_HOOKS_URL
+              value: "http://mu.agents.svc.cluster.local:18789/hooks/agent"
+            - name: BETA_HOOKS_URL
+              value: "http://beta.agents.svc.cluster.local:18789/hooks/agent"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      imagePullSecrets:
+        - name: ghcr-secret
