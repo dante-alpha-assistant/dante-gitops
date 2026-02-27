@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mu
+  namespace: agents
+  labels:
+    app: mu
+    role: agent
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # PVC can only attach to one pod
+  selector:
+    matchLabels:
+      app: mu
+  template:
+    metadata:
+      labels:
+        app: mu
+        role: agent
+    spec:
+      containers:
+        - name: openclaw
+          image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+          ports:
+            - containerPort: 18789
+          envFrom:
+            - secretRef:
+                name: mu-env
+          env:
+            - name: OPENCLAW_CONFIG
+              value: /root/.openclaw/openclaw.json
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
+            - name: config
+              mountPath: /root/.openclaw/openclaw.json
+              subPath: openclaw.json
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 1Gi
+            limits:
+              cpu: 4000m
+              memory: 8Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mu-data
+        - name: config
+          configMap:
+            name: mu-config
+      imagePullSecrets:
+        - name: ghcr-secret
