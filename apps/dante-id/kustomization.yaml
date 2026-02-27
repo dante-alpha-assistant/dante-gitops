@@ -3,7 +3,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
-  - secret.yaml
   - deployment.yaml
   - service.yaml
   - ingress.yaml
+# Secret managed via kubectl (not in gitops to avoid plaintext creds)
