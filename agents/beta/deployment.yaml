@@ -81,6 +81,7 @@ spec:
                     subagents: { maxConcurrent: 8 }
                   }
                 },
+                hooks: { enabled: true, token: "beta-hooks-tok-2026", allowRequestSessionKey: true, allowedSessionKeyPrefixes: ["hook:task:"] },
                 tools: { sessions: { visibility: "all" } }
               };
               fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
