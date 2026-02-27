@@ -9,7 +9,7 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    type: Recreate  # PVC can only attach to one pod
+    type: Recreate
   selector:
     matchLabels:
       app: neo
@@ -19,6 +19,56 @@ spec:
         app: neo
         role: agent
     spec:
+      initContainers:
+        - name: init-config
+          image: node:22-bookworm-slim
+          command: ["sh", "-c"]
+          args:
+            - |
+              mkdir -p /root/.openclaw/workspace /root/.openclaw/skills
+              cat > /root/.openclaw/openclaw.json << EOCFG
+              {
+                "gateway": {
+                  "port": 18789,
+                  "mode": "local",
+                  "bind": "lan",
+                  "auth": { "mode": "token", "token": "${OPENCLAW_GATEWAY_TOKEN}" },
+                  "tools": { "allow": ["sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] }
+                },
+                "channels": {
+                  "discord": {
+                    "enabled": true,
+                    "token": "${DISCORD_TOKEN}",
+                    "guildId": "1471822298444206104",
+                    "channelIds": ["1471822299203371030","1476656995221111027"],
+                    "allowBots": true
+                  }
+                },
+                "models": {
+                  "providers": {
+                    "anthropic": { "apiKey": "${ANTHROPIC_API_KEY}" },
+                    "openrouter": { "apiKey": "${OPENROUTER_API_KEY}" },
+                    "openai": { "apiKey": "${OPENAI_API_KEY}" }
+                  }
+                },
+                "agents": {
+                  "defaults": {
+                    "model": { "primary": "anthropic/claude-opus-4-6" },
+                    "workspace": "/root/.openclaw/workspace",
+                    "compaction": { "mode": "safeguard" },
+                    "maxConcurrent": 4,
+                    "subagents": { "maxConcurrent": 8 }
+                  }
+                },
+                "tools": { "sessions": { "visibility": "all" } }
+              }
+              EOCFG
+          envFrom:
+            - secretRef:
+                name: neo-env
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
       containers:
         - name: openclaw
           image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
@@ -27,15 +77,9 @@ spec:
           envFrom:
             - secretRef:
                 name: neo-env
-          env:
-            - name: OPENCLAW_CONFIG
-              value: /root/.openclaw/openclaw.json
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
-            - name: config
-              mountPath: /root/.openclaw/openclaw.json
-              subPath: openclaw.json
           resources:
             requests:
               cpu: 500m
@@ -47,8 +91,5 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: neo-data
-        - name: config
-          configMap:
-            name: neo-config
       imagePullSecrets:
         - name: ghcr-secret
