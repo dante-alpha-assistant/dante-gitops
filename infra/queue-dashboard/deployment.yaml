@@ -20,8 +20,10 @@ spec:
           ports:
             - containerPort: 3000
           env:
-            - name: REDIS_URL
-              value: "redis://redis.infra.svc.cluster.local:6379"
+            - name: SUPABASE_URL
+              value: "https://lessxkxujvcmublgwdaa.supabase.co"
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI"
             - name: PORT
               value: "3000"
             - name: NODE_ENV
