@@ -5,4 +5,5 @@ resources:
   - neo/
   - mu/
   - beta/
+  - flow/
   - worker-template/
