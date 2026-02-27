@@ -33,14 +33,15 @@ spec:
                   mode: "local",
                   bind: "lan",
                   auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "" },
-                  tools: { allow: ["sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] }
+                  tools: { allow: ["sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] },
+                  controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
                 },
                 channels: {
                   discord: {
                     enabled: true,
                     token: e.DISCORD_TOKEN || "",
                     groupPolicy: "open",
-                    dm: { policy: "pairing" },
+                    dmPolicy: "pairing",
                     allowBots: true
                   }
                 },
