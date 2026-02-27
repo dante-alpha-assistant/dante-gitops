@@ -1,0 +1,95 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: worker-
+  namespace: agents
+  labels:
+    app: worker
+    role: headless-agent
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 300
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app: worker
+        role: headless-agent
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: openclaw
+          image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+          command: ["node", "-e"]
+          args:
+            - |
+              const { QueueClient, TaskConsumer } = require('/root/.openclaw/workspace/agent-queue/dist/index.js');
+              const { execSync } = require('child_process');
+              
+              async function main() {
+                const client = new QueueClient('redis://redis.infra.svc.cluster.local:6379');
+                await client.connect();
+                await client.ensureStreams();
+                
+                const workerId = `worker-${process.env.HOSTNAME}`;
+                const consumer = new TaskConsumer(client, workerId);
+                
+                // Claim one task, execute, exit
+                const task = await consumer.claim();
+                if (!task) {
+                  console.log('No tasks available');
+                  process.exit(0);
+                }
+                
+                console.log(`Processing task: ${task.id}`);
+                try {
+                  // Execute via sessions_spawn on local gateway
+                  const result = execSync(`openclaw sessions spawn --task "${task.payload.prompt}" --timeout 300`, {
+                    encoding: 'utf8',
+                    timeout: 300000
+                  });
+                  await consumer.ack(task.id, { output: result });
+                  console.log(`Task ${task.id} completed`);
+                } catch (err) {
+                  await consumer.fail(task.id, err.message);
+                  console.error(`Task ${task.id} failed:`, err.message);
+                }
+                
+                await client.disconnect();
+                process.exit(0);
+              }
+              
+              main().catch(e => { console.error(e); process.exit(1); });
+          env:
+            - name: REDIS_URL
+              value: "redis://redis.infra.svc.cluster.local:6379"
+          envFrom:
+            - secretRef:
+                name: worker-env
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          volumeMounts:
+            - name: workspace
+              mountPath: /root/.openclaw/workspace
+      initContainers:
+        - name: setup
+          image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+          command: ["sh", "-c"]
+          args:
+            - |
+              cd /root/.openclaw/workspace
+              if [ ! -d agent-queue ]; then
+                git clone https://github.com/dante-alpha-assistant/agent-queue.git
+                cd agent-queue && npm install && npm run build
+              fi
+          volumeMounts:
+            - name: workspace
+              mountPath: /root/.openclaw/workspace
+      volumes:
+        - name: workspace
+          emptyDir: {}
