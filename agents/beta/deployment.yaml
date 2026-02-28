@@ -82,7 +82,8 @@ spec:
                   }
                 },
                 hooks: { enabled: true, token: "beta-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
-                tools: { sessions: { visibility: "all" } }
+                tools: { sessions: { visibility: "all" } },
+                skills: { "task-manager": { location: "/root/.openclaw/skills/task-manager" } }
               };
               fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
               fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
