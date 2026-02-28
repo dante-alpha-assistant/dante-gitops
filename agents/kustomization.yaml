@@ -6,4 +6,5 @@ resources:
   - mu/
   - beta/
   - flow/
+  - ifra/
   - worker-template/
