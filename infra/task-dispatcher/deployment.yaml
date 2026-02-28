@@ -13,6 +13,7 @@ spec:
       labels:
         app: task-dispatcher
     spec:
+      serviceAccountName: task-dispatcher
       containers:
         - name: dispatcher
           image: ghcr.io/dante-alpha-assistant/task-dispatcher:latest
@@ -48,6 +49,12 @@ spec:
               value: "1"
             - name: SCHEDULER_INTERVAL_MS
               value: "15000"
+            - name: QA_MAX_WORKERS
+              value: "3"
+            - name: QA_SCALER_INTERVAL_MS
+              value: "30000"
+            - name: QA_WORKER_IMAGE
+              value: "ghcr.io/dante-alpha-assistant/openclaw-agent:latest"
             - name: NEO_GATEWAY_TOKEN
               value: "3f96d14d49491b032030e9f4a8dd7d9f985d2a7669e83f67"
             - name: MU_GATEWAY_TOKEN
