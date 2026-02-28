@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: pingboard-ingress
-  namespace: agents
+  namespace: apps
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
@@ -21,4 +21,4 @@ spec:
               service:
                 name: pingboard
                 port:
-                  number: 80
+                  number: 9091

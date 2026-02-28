@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pingboard
+  namespace: apps
+spec:
+  selector:
+    app: pingboard
+  ports:
+    - port: 9091
+      targetPort: 9091
+      protocol: TCP
