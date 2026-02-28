@@ -26,21 +26,44 @@ spec:
           args:
             - |
               set -e
-              apt-get update -qq && apt-get install -y -qq curl ca-certificates > /dev/null 2>&1
+              apt-get update -qq && apt-get install -y -qq curl ca-certificates openssh-client > /dev/null 2>&1
               KUBE_VER=v1.31.0
               curl -sL "https://dl.k8s.io/release/${KUBE_VER}/bin/linux/amd64/kubectl" -o /tools/kubectl
               chmod +x /tools/kubectl
               echo "kubectl ${KUBE_VER} installed"
+              # SSH key persistence on PVC
+              SSH_DIR=/pvc/.ssh
+              mkdir -p "$SSH_DIR"
+              if [ ! -f "$SSH_DIR/id_ed25519" ]; then
+                echo "Generating new SSH key pair on PVC..."
+                ssh-keygen -t ed25519 -f "$SSH_DIR/id_ed25519" -N "" -q
+                echo "SSH key generated"
+              else
+                echo "SSH key already exists on PVC, reusing"
+              fi
+              # Copy known_hosts from secret if available, merge with PVC
+              if [ -f /ssh-in/known_hosts ]; then
+                cp /ssh-in/known_hosts "$SSH_DIR/known_hosts"
+              fi
+              # Ensure correct permissions
+              chmod 700 "$SSH_DIR"
+              chmod 600 "$SSH_DIR/id_ed25519"
+              chmod 644 "$SSH_DIR/id_ed25519.pub"
+              [ -f "$SSH_DIR/known_hosts" ] && chmod 644 "$SSH_DIR/known_hosts"
+              # Copy to ssh-out for main container mount
               mkdir -p /ssh-out
-              cp /ssh-in/id_ed25519 /ssh-out/id_ed25519
-              cp /ssh-in/id_ed25519.pub /ssh-out/id_ed25519.pub
-              cp /ssh-in/known_hosts /ssh-out/known_hosts
+              cp "$SSH_DIR/id_ed25519" /ssh-out/id_ed25519
+              cp "$SSH_DIR/id_ed25519.pub" /ssh-out/id_ed25519.pub
+              [ -f "$SSH_DIR/known_hosts" ] && cp "$SSH_DIR/known_hosts" /ssh-out/known_hosts
               chmod 600 /ssh-out/id_ed25519
-              chmod 644 /ssh-out/id_ed25519.pub /ssh-out/known_hosts
-              echo "SSH keys installed"
+              chmod 644 /ssh-out/id_ed25519.pub
+              [ -f /ssh-out/known_hosts ] && chmod 644 /ssh-out/known_hosts
+              echo "SSH keys installed from PVC"
           volumeMounts:
             - name: tools-bin
               mountPath: /tools
+            - name: data
+              mountPath: /pvc
             - name: ssh-keys
               mountPath: /ssh-in
               readOnly: true
