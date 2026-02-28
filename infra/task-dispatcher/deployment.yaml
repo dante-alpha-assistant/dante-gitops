@@ -48,6 +48,14 @@ spec:
               value: "1"
             - name: SCHEDULER_INTERVAL_MS
               value: "15000"
+            - name: NEO_GATEWAY_TOKEN
+              value: "3f96d14d49491b032030e9f4a8dd7d9f985d2a7669e83f67"
+            - name: MU_GATEWAY_TOKEN
+              value: "mu-gw-tok-2026"
+            - name: BETA_GATEWAY_TOKEN
+              value: "beta-gw-tok-2026"
+            - name: FLOW_GATEWAY_TOKEN
+              value: "flow-gw-tok-2026"
           resources:
             requests:
               cpu: 50m
