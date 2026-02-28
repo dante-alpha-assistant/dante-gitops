@@ -20,6 +20,32 @@ spec:
         role: agent
     spec:
       initContainers:
+        - name: init-tools
+          image: debian:bookworm-slim
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              apt-get update -qq && apt-get install -y -qq curl ca-certificates > /dev/null 2>&1
+              KUBE_VER=v1.31.0
+              curl -sL "https://dl.k8s.io/release/${KUBE_VER}/bin/linux/amd64/kubectl" -o /tools/kubectl
+              chmod +x /tools/kubectl
+              echo "kubectl ${KUBE_VER} installed"
+              mkdir -p /ssh-out
+              cp /ssh-in/id_ed25519 /ssh-out/id_ed25519
+              cp /ssh-in/id_ed25519.pub /ssh-out/id_ed25519.pub
+              cp /ssh-in/known_hosts /ssh-out/known_hosts
+              chmod 600 /ssh-out/id_ed25519
+              chmod 644 /ssh-out/id_ed25519.pub /ssh-out/known_hosts
+              echo "SSH keys installed"
+          volumeMounts:
+            - name: tools-bin
+              mountPath: /tools
+            - name: ssh-keys
+              mountPath: /ssh-in
+              readOnly: true
+            - name: ssh-out
+              mountPath: /ssh-out
         - name: init-config
           image: node:22-bookworm-slim
           command: ["node", "-e"]
@@ -102,9 +128,18 @@ spec:
           envFrom:
             - secretRef:
                 name: neo-env
+          env:
+            - name: PATH
+              value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
+            - name: tools-bin
+              mountPath: /tools
+              readOnly: true
+            - name: ssh-out
+              mountPath: /root/.ssh
+              readOnly: true
           resources:
             requests:
               cpu: 500m
@@ -126,5 +161,13 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: neo-data
+        - name: tools-bin
+          emptyDir: {}
+        - name: ssh-keys
+          secret:
+            secretName: neo-ssh
+            defaultMode: 0600
+        - name: ssh-out
+          emptyDir: {}
       imagePullSecrets:
         - name: ghcr-secret
