@@ -16,7 +16,7 @@ data:
       },
       "agents": {
         "defaults": {
-          "model": { "primary": "openrouter/moonshotai/kimi-k2.5" },
+          "model": { "primary": "anthropic/claude-opus-4-6" },
           "workspace": "/root/.openclaw/workspace",
           "compaction": { "mode": "safeguard" },
           "maxConcurrent": 4,
