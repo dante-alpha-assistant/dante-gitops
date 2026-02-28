@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pingboard-ingress
+  namespace: agents
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - pingboard.dante.id
+      secretName: pingboard-tls
+  rules:
+    - host: pingboard.dante.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pingboard
+                port:
+                  number: 80
