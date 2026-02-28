@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: dispatcher
-          image: ghcr.io/dante-alpha-assistant/task-dispatcher:v2
+          image: ghcr.io/dante-alpha-assistant/task-dispatcher:latest
           imagePullPolicy: Always
           env:
             - name: SUPABASE_URL
