@@ -41,10 +41,14 @@ spec:
               else
                 echo "SSH key already exists on PVC, reusing"
               fi
-              # Copy known_hosts from secret if available, merge with PVC
+              # Scan GitHub + K8s host keys and merge with PVC known_hosts
+              ssh-keyscan github.com 167.235.61.168 >> "$SSH_DIR/known_hosts" 2>/dev/null
+              # Also merge from secret if available
               if [ -f /ssh-in/known_hosts ]; then
-                cp /ssh-in/known_hosts "$SSH_DIR/known_hosts"
+                cat /ssh-in/known_hosts >> "$SSH_DIR/known_hosts"
               fi
+              # Deduplicate
+              sort -u "$SSH_DIR/known_hosts" -o "$SSH_DIR/known_hosts"
               # Ensure correct permissions
               chmod 700 "$SSH_DIR"
               chmod 600 "$SSH_DIR/id_ed25519"
