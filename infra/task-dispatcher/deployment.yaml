@@ -39,6 +39,10 @@ spec:
               value: "flow-hooks-tok-2026"
             - name: FLOW_HOOKS_URL
               value: "http://flow.agents.svc.cluster.local:18789/hooks/agent"
+            - name: IFRA_HOOKS_TOKEN
+              value: "ifra-hooks-tok-2026"
+            - name: IFRA_HOOKS_URL
+              value: "http://ifra.agents.svc.cluster.local:18789/hooks/agent"
             - name: NEO_MAX_CONCURRENT
               value: "2"
             - name: MU_MAX_CONCURRENT
@@ -47,6 +51,10 @@ spec:
               value: "1"
             - name: FLOW_MAX_CONCURRENT
               value: "1"
+            - name: IFRA_MAX_CONCURRENT
+              value: "2"
+            - name: IFRA_GATEWAY_TOKEN
+              value: "ifra-gw-tok-2026"
             - name: SCHEDULER_INTERVAL_MS
               value: "15000"
             - name: QA_MAX_WORKERS
