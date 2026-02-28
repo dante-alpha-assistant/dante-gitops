@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: pingboard-ingress
-  namespace: apps
+  namespace: infra
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
@@ -19,6 +19,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: pingboard
+                name: queue-dashboard
                 port:
-                  number: 9091
+                  number: 3000
