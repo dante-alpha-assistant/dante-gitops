@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev
+  namespace: argocd
+  annotations:
+    argocd-image-updater.argoproj.io/force-update: "true"
+    argocd-image-updater.argoproj.io/image-list: "qd=ghcr.io/dante-alpha-assistant/queue-dashboard:latest,td=ghcr.io/dante-alpha-assistant/task-dispatcher:latest"
+    argocd-image-updater.argoproj.io/qd.update-strategy: digest
+    argocd-image-updater.argoproj.io/td.update-strategy: digest
+    argocd-image-updater.argoproj.io/write-back-method: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dante-alpha-assistant/dante-gitops.git
+    targetRevision: main
+    path: dev
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
