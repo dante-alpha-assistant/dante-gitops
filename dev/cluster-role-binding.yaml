@@ -14,7 +14,7 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: task-dispatcher-argocd-reader
+  name: task-dispatcher-argocd-reader-dev
 subjects:
   - kind: ServiceAccount
     name: task-dispatcher
