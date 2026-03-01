@@ -1,11 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: ifra
+  name: ifra-worker
   namespace: agents
+  labels:
+    app: ifra-worker
 spec:
   selector:
-    app: ifra
+    app: ifra-worker
   ports:
     - port: 18789
       targetPort: 18789
