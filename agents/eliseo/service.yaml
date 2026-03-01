@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: eliseo
+  namespace: agents
+  labels:
+    app: eliseo
+spec:
+  selector:
+    app: eliseo
+  ports:
+    - port: 18789
+      targetPort: 18789
+      protocol: TCP
+  type: ClusterIP

@@ -7,5 +7,6 @@ resources:
   - beta/
   - flow/
   - ifra/
+  - eliseo/
   - neo-worker/
   - worker-template/
