@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ifra
+  name: ifra-worker
   namespace: agents
   labels:
-    app: ifra
-    role: agent
+    app: ifra-worker
+    role: worker
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: ifra
+      app: ifra-worker
   template:
     metadata:
       labels:
-        app: ifra
-        role: agent
+        app: ifra-worker
+        role: worker
     spec:
       initContainers:
         - name: init-config
@@ -35,15 +35,6 @@ spec:
                   auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "" },
                   tools: { allow: ["sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] },
                   controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
-                },
-                channels: {
-                  discord: {
-                    enabled: true,
-                    token: e.DISCORD_TOKEN || "",
-                    groupPolicy: "open",
-                    dmPolicy: "pairing",
-                    allowBots: true
-                  }
                 },
                 models: {
                   providers: {
@@ -69,7 +60,7 @@ spec:
                     model: { primary: "anthropic/claude-opus-4-6" },
                     workspace: "/root/.openclaw/workspace",
                     compaction: { mode: "safeguard" },
-                    maxConcurrent: 4,
+                    maxConcurrent: 8,
                     subagents: { maxConcurrent: 8 },
                     heartbeat: { every: "5m" }
                   }
@@ -82,7 +73,7 @@ spec:
               fs.mkdirSync('/root/.openclaw/agents/main/agent', { recursive: true });
               fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
 
-              // Auth profiles — ensures OpenRouter is used, not Anthropic fallback
+              // Auth profiles
               const authProfiles = {
                 "anthropic:default": {
                   type: "token",
@@ -97,14 +88,15 @@ spec:
               };
               fs.writeFileSync('/root/.openclaw/agents/main/agent/auth-profiles.json', JSON.stringify(authProfiles, null, 2));
 
-              // SOUL.md -- DevOps engineer persona (only write if not exists, preserve agent edits)
+              // SOUL.md
               const soulPath = '/root/.openclaw/workspace/SOUL.md';
               if (!fs.existsSync(soulPath) || fs.readFileSync(soulPath, 'utf8').trim().length === 0) {
                 const soul = [
-                  "# SOUL.md - Ifra, DevOps Engineer",
+                  "# SOUL.md - Ifra Worker (Headless)",
                   "",
                   "## Identity",
-                  "You are **Ifra**, the dedicated DevOps/Infrastructure engineer for Dante's AI agent fleet.",
+                  "You are **Ifra**, a headless DevOps/Infrastructure worker for Dante's AI agent fleet.",
+                  "You have NO Discord connection. You receive work exclusively via webhook hooks from the task dispatcher.",
                   "",
                   "## Role",
                   "You own ALL infrastructure, deployments, and operations:",
@@ -114,58 +106,20 @@ spec:
                   "- **Services** -- MongoDB, Redis, task-dispatcher, queue-dashboard, any new infra",
                   "- **Networking** -- ingress, TLS certs (cert-manager), DNS coordination",
                   "- **GitOps repo** -- dante-gitops on GitHub is the single source of truth",
-                  "- **Monitoring** -- pod health, log analysis, resource usage",
                   "",
                   "## Critical Rules",
-                  "- **ALL changes go through GitOps.** Never edit K8s directly unless emergency (then backport immediately).",
-                  "- **GitOps repo** dante-alpha-assistant/dante-gitops (agents/, infra/, apps/)",
+                  "- **ALL changes go through GitOps.** Never edit K8s directly unless emergency.",
                   "- **NEVER delete tasks from the task board.** Tasks are immutable history.",
                   "- **ALL work must go through a task on tasks.dante.id.** No side fixes.",
-                  "- **ALWAYS tag agents in EVERY Discord message.** Agents only see @mentions.",
+                  "- Focus on the hook task. Complete it. Report back. No distractions.",
                   "",
                   "## Infrastructure Context",
-                  "",
-                  "### K8s Cluster",
-                  "- Host 167.235.61.168 (Hetzner, K3s), SSH as root (key-based)",
-                  "- Namespaces agents, infra, apps, kube-system, argocd",
-                  "- Sealed Secrets kube-system/sealed-secrets, use kubeseal on server",
-                  "- Cert-manager Let's Encrypt TLS",
-                  "- Traefik ingress controller",
-                  "",
-                  "### Active Agents (agents namespace)",
-                  "- Neo coder, kimi-k2.5, capacity 2, PVC",
-                  "- Beta QA, kimi-k2.5, capacity 1, PVC",
-                  "- Mu DISABLED",
-                  "- Flow general purpose, Fernando's agent",
-                  "- Ifra YOU",
-                  "- Alpha Product owner, Dante's Mac (NOT in K8s)",
-                  "",
-                  "### Infra Services",
-                  "- task-dispatcher Supabase Realtime, dispatches via /hooks/agent",
-                  "- queue-dashboard tasks.dante.id (React + Express)",
-                  "",
-                  "### Supabase",
-                  "- URL https://lessxkxujvcmublgwdaa.supabase.co",
-                  "- Tables agent_tasks, agent_cards, agent_projects",
-                  "",
-                  "### DNS",
-                  "- dante.id via Namecheap, all subdomains -> 167.235.61.168",
-                  "",
-                  "### Discord",
-                  "- Agent Fleet 1471822298444206104, #general 1471822299203371030",
-                  "- Perlea 1476656916641087658, #dante-agents 1476656995221111027",
-                  "- IDs Alpha=1473014065503666268, Neo=1471821951663214737, Beta=1473023028890833019, Ifra=1477315872447008950, Dante=185059032531206146",
-                  "",
-                  "## Vibe",
-                  "Calm, methodical, SRE mindset. You keep the platform running. Reliability > features.",
+                  "- K8s cluster: 167.235.61.168 (Hetzner, K3s), SSH as root (key-based)",
+                  "- GitOps repo: dante-alpha-assistant/dante-gitops",
+                  "- Namespaces: agents, infra, apps, kube-system, argocd",
+                  "- Sealed Secrets: kube-system/sealed-secrets, use kubeseal on server",
                 ].join("\n");
                 fs.writeFileSync(soulPath, soul);
-              }
-
-              // IDENTITY.md
-              const idPath = '/root/.openclaw/workspace/IDENTITY.md';
-              if (!fs.existsSync(idPath)) {
-                fs.writeFileSync(idPath, '# IDENTITY.md\\n\\n- **Name:** Ifra\\n- **Creature:** DevOps Engineer\\n- **Emoji:** 🔧\\n');
               }
 
               // HEARTBEAT.md — agent card self-update
@@ -191,14 +145,13 @@ spec:
                 'If the agent_card has status "disabled", do NOT override it — skip the update and reply HEARTBEAT_OK.',
                 'If the curl succeeds, reply HEARTBEAT_OK.',
               ].join('\\n');
-              // Only write if not already customized by the agent
               if (!fs.existsSync(hbPath) || fs.readFileSync(hbPath, 'utf8').includes('Keep this file empty')) {
                 fs.writeFileSync(hbPath, heartbeat);
               }
-              console.log('Config + SOUL + auth + HEARTBEAT.md written OK');
+              console.log('Ifra-worker headless config + HEARTBEAT.md written OK');
           envFrom:
             - secretRef:
-                name: ifra-env
+                name: ifra-worker-env
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
@@ -209,7 +162,7 @@ spec:
             - containerPort: 18789
           envFrom:
             - secretRef:
-                name: ifra-env
+                name: ifra-worker-env
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw

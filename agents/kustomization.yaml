@@ -6,7 +6,7 @@ resources:
   - mu/
   - beta/
   - flow/
-  - ifra/
+  - ifra-worker/
   - eliseo/
   - neo-worker/
   - worker-template/

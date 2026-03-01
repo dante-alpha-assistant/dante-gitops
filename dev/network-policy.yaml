@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-from-prod
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow traffic from within dev namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              environment: dev
+    # Allow traffic from agents namespace (task-dispatcher needs to reach agents)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: agents
+    # Allow traffic from kube-system (DNS, ingress controller)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+    # Allow traffic from argocd namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: argocd
