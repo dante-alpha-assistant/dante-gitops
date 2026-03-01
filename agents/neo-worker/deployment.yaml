@@ -104,7 +104,8 @@ spec:
                     workspace: "/root/.openclaw/workspace",
                     compaction: { mode: "safeguard" },
                     maxConcurrent: 4,
-                    subagents: { maxConcurrent: 8 }
+                    subagents: { maxConcurrent: 8 },
+                    heartbeat: { every: "5m" }
                   }
                 },
                 hooks: { enabled: true, token: "neo-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
@@ -113,7 +114,34 @@ spec:
               fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
               fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
               fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
-              console.log('Config written OK — NO DISCORD, hooks only');
+              // HEARTBEAT.md — agent card self-update
+              const hbPath = '/root/.openclaw/workspace/HEARTBEAT.md';
+              const agentId = 'neo-worker';
+              const sbUrl = 'https://lessxkxujvcmublgwdaa.supabase.co';
+              const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI';
+              const heartbeat = [
+                '# HEARTBEAT.md — Agent Card Self-Update',
+                '',
+                'Update your agent_card to signal liveness. Run this every heartbeat:',
+                '',
+                '```task',
+                'Run the following curl command to update your agent card (do NOT modify the command):',
+                '',
+                `curl -s -X PATCH "${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}" \\`,
+                `  -H "apikey: ${sbKey}" \\`,
+                `  -H "Authorization: Bearer ${sbKey}" \\`,
+                '  -H "Content-Type: application/json" \\',
+                `  -d '{"status":"online","last_heartbeat":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}'`,
+                '```',
+                '',
+                'If the agent_card has status "disabled", do NOT override it — skip the update and reply HEARTBEAT_OK.',
+                'If the curl succeeds, reply HEARTBEAT_OK.',
+              ].join('\\n');
+              // Only write if not already customized by the agent
+              if (!fs.existsSync(hbPath) || fs.readFileSync(hbPath, 'utf8').includes('Keep this file empty')) {
+                fs.writeFileSync(hbPath, heartbeat);
+              }
+              console.log('Config + HEARTBEAT.md written OK — NO DISCORD, hooks only');
           envFrom:
             - secretRef:
                 name: neo-worker-env
