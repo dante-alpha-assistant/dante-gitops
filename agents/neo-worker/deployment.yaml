@@ -141,6 +141,29 @@ spec:
               if (!fs.existsSync(hbPath) || fs.readFileSync(hbPath, 'utf8').includes('Keep this file empty')) {
                 fs.writeFileSync(hbPath, heartbeat);
               }
+              // Seed heartbeat cron job
+              const cronDir = '/root/.openclaw/cron';
+              const cronPath = cronDir + '/jobs.json';
+              fs.mkdirSync(cronDir, { recursive: true });
+              if (!fs.existsSync(cronPath)) {
+                const cronJobs = {
+                  version: 1,
+                  jobs: [{
+                    id: 'heartbeat-agent-card',
+                    name: 'heartbeat-agent-card',
+                    enabled: true,
+                    createdAtMs: Date.now(),
+                    updatedAtMs: Date.now(),
+                    schedule: { kind: 'every', everyMs: 300000, anchorMs: Date.now() },
+                    sessionTarget: 'isolated',
+                    wakeMode: 'now',
+                    payload: { kind: 'agentTurn', message: 'Run the heartbeat: update your agent card. Read HEARTBEAT.MD and follow it.', timeoutSeconds: 30 },
+                    delivery: { mode: 'none', channel: 'last' },
+                    state: { nextRunAtMs: Date.now() + 300000 }
+                  }]
+                };
+                fs.writeFileSync(cronPath, JSON.stringify(cronJobs, null, 2));
+              }
               console.log('Config + HEARTBEAT.md written OK — NO DISCORD, hooks only');
           envFrom:
             - secretRef:
