@@ -55,6 +55,12 @@ spec:
               value: "2"
             - name: IFRA_GATEWAY_TOKEN
               value: "ifra-gw-tok-2026"
+            - name: ARGOCD_URL
+              value: "https://ops.dante.id"
+            - name: ARGOCD_USERNAME
+              value: "admin"
+            - name: ARGOCD_PASSWORD
+              value: "IO8n27nWhcQnfjBo"
             - name: SCHEDULER_INTERVAL_MS
               value: "15000"
             - name: QA_MAX_WORKERS
