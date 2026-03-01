@@ -1,0 +1,169 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neo-worker
+  namespace: agents
+  labels:
+    app: neo-worker
+    role: agent
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: neo-worker
+  template:
+    metadata:
+      labels:
+        app: neo-worker
+        role: agent
+    spec:
+      initContainers:
+        - name: init-tools
+          image: debian:bookworm-slim
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              apt-get update -qq && apt-get install -y -qq curl ca-certificates openssh-client > /dev/null 2>&1
+              KUBE_VER=v1.31.0
+              curl -sL "https://dl.k8s.io/release/${KUBE_VER}/bin/linux/amd64/kubectl" -o /tools/kubectl
+              chmod +x /tools/kubectl
+              echo "kubectl ${KUBE_VER} installed"
+              SSH_DIR=/pvc/.ssh
+              mkdir -p "$SSH_DIR"
+              if [ ! -f "$SSH_DIR/id_ed25519" ]; then
+                ssh-keygen -t ed25519 -f "$SSH_DIR/id_ed25519" -N "" -q
+              fi
+              ssh-keyscan github.com 167.235.61.168 >> "$SSH_DIR/known_hosts" 2>/dev/null
+              sort -u "$SSH_DIR/known_hosts" -o "$SSH_DIR/known_hosts"
+              chmod 700 "$SSH_DIR"
+              chmod 600 "$SSH_DIR/id_ed25519"
+              chmod 644 "$SSH_DIR/id_ed25519.pub"
+              [ -f "$SSH_DIR/known_hosts" ] && chmod 644 "$SSH_DIR/known_hosts"
+              mkdir -p /ssh-out
+              cp "$SSH_DIR/id_ed25519" /ssh-out/id_ed25519
+              cp "$SSH_DIR/id_ed25519.pub" /ssh-out/id_ed25519.pub
+              [ -f "$SSH_DIR/known_hosts" ] && cp "$SSH_DIR/known_hosts" /ssh-out/known_hosts
+              chmod 600 /ssh-out/id_ed25519
+              chmod 644 /ssh-out/id_ed25519.pub
+              [ -f /ssh-out/known_hosts ] && chmod 644 /ssh-out/known_hosts
+              echo "Tools + SSH ready"
+          volumeMounts:
+            - name: tools-bin
+              mountPath: /tools
+            - name: data
+              mountPath: /pvc
+            - name: ssh-out
+              mountPath: /ssh-out
+        - name: init-config
+          image: node:22-bookworm-slim
+          command: ["node", "-e"]
+          args:
+            - |
+              const fs = require('fs');
+              const e = process.env;
+              const config = {
+                gateway: {
+                  port: 18789,
+                  mode: "local",
+                  bind: "lan",
+                  auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "" },
+                  tools: { allow: ["sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] },
+                  controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
+                },
+                models: {
+                  providers: {
+                    anthropic: {
+                      baseUrl: "https://api.anthropic.com",
+                      apiKey: e.ANTHROPIC_API_KEY || "",
+                      models: [{ id: "claude-opus-4-6", name: "claude-opus-4-6", api: "anthropic-messages", reasoning: true, input: ["text","image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 }]
+                    },
+                    openrouter: {
+                      baseUrl: "https://openrouter.ai/api/v1",
+                      apiKey: e.OPENROUTER_API_KEY || "",
+                      models: [
+                        { id: "moonshotai/kimi-k2.5", name: "kimi-k2.5", api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 0.45, output: 2.25, cacheRead: 0.07, cacheWrite: 0 }, contextWindow: 262144, maxTokens: 8192 }
+                      ]
+                    },
+                    openai: {
+                      baseUrl: "https://api.openai.com/v1",
+                      apiKey: e.OPENAI_API_KEY || "",
+                      auth: "api-key",
+                      api: "openai-responses",
+                      models: [
+                        { id: "gpt-5.2-codex", name: "gpt-5.2-codex", api: "openai-responses", reasoning: true, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 400000, maxTokens: 16384 }
+                      ]
+                    }
+                  }
+                },
+                agents: {
+                  defaults: {
+                    model: { primary: "anthropic/claude-opus-4-6" },
+                    workspace: "/root/.openclaw/workspace",
+                    compaction: { mode: "safeguard" },
+                    maxConcurrent: 4,
+                    subagents: { maxConcurrent: 8 }
+                  }
+                },
+                hooks: { enabled: true, token: "neo-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
+                tools: { sessions: { visibility: "all" } }
+              };
+              fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
+              fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
+              fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
+              console.log('Config written OK — NO DISCORD, hooks only');
+          envFrom:
+            - secretRef:
+                name: neo-worker-env
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
+      containers:
+        - name: openclaw
+          image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+          ports:
+            - containerPort: 18789
+          envFrom:
+            - secretRef:
+                name: neo-worker-env
+          env:
+            - name: PATH
+              value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
+            - name: tools-bin
+              mountPath: /tools
+              readOnly: true
+            - name: ssh-out
+              mountPath: /root/.ssh
+              readOnly: true
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          livenessProbe:
+            tcpSocket:
+              port: 18789
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 18789
+            initialDelaySeconds: 15
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: neo-worker-data
+        - name: tools-bin
+          emptyDir: {}
+        - name: ssh-out
+          emptyDir: {}
+      imagePullSecrets:
+        - name: ghcr-secret

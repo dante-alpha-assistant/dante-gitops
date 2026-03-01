@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: neo-worker
+  namespace: agents
+spec:
+  selector:
+    app: neo-worker
+  ports:
+    - port: 18789
+      targetPort: 18789
+      protocol: TCP
