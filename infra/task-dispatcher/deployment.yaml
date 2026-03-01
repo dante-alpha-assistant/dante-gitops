@@ -63,6 +63,14 @@ spec:
               value: "30000"
             - name: QA_WORKER_IMAGE
               value: "ghcr.io/dante-alpha-assistant/openclaw-agent:latest"
+            - name: NEO_WORKER_HOOKS_TOKEN
+              value: "neo-worker-hooks-tok-2026"
+            - name: NEO_WORKER_HOOKS_URL
+              value: "http://neo-worker.agents.svc.cluster.local:18789/hooks/agent"
+            - name: NEO_WORKER_MAX_CONCURRENT
+              value: "3"
+            - name: NEO_WORKER_GATEWAY_TOKEN
+              value: "neo-worker-gw-tok-2026"
             - name: NEO_GATEWAY_TOKEN
               value: "3f96d14d49491b032030e9f4a8dd7d9f985d2a7669e83f67"
             - name: MU_GATEWAY_TOKEN
