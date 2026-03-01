@@ -1,0 +1,149 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-template
+  namespace: agents
+  labels:
+    app: worker-template
+    role: headless-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker-template
+  template:
+    metadata:
+      labels:
+        app: worker-template
+        role: headless-agent
+    spec:
+      terminationGracePeriodSeconds: 30
+      initContainers:
+        - name: init-config
+          image: node:22-bookworm-slim
+          command: ["node", "-e"]
+          args:
+            - |
+              const fs = require('fs');
+              const e = process.env;
+              const model = e.WORKER_MODEL || 'google/gemini-3-pro-preview';
+              const agentName = e.WORKER_NAME || 'worker';
+              const capacity = parseInt(e.WORKER_CAPACITY || '3', 10);
+              const capabilities = (e.WORKER_CAPABILITIES || 'coding').split(',');
+
+              const config = {
+                gateway: {
+                  port: 18789,
+                  mode: "local",
+                  bind: "lan",
+                  auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "worker-gw-tok-2026" },
+                  tools: { allow: ["sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] },
+                  controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
+                },
+                channels: {},
+                models: {
+                  providers: {
+                    openrouter: {
+                      baseUrl: "https://openrouter.ai/api/v1",
+                      apiKey: e.OPENROUTER_API_KEY || "",
+                      models: [
+                        { id: model, name: model.split('/').pop(), api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 262144, maxTokens: 8192 }
+                      ]
+                    }
+                  }
+                },
+                agents: {
+                  defaults: {
+                    model: { primary: `openrouter/${model}` },
+                    workspace: "/root/.openclaw/workspace",
+                    compaction: { mode: "safeguard" },
+                    maxConcurrent: 4,
+                    subagents: { maxConcurrent: 4 }
+                  }
+                },
+                hooks: { enabled: true, token: e.HOOKS_TOKEN || `${agentName}-hooks-tok-2026`, allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
+                tools: { sessions: { visibility: "all" } }
+              };
+              fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
+              fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
+              fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
+
+              // Write minimal SOUL.md
+              fs.writeFileSync('/root/.openclaw/workspace/SOUL.md', `# SOUL.md - ${agentName}\n\nYou are **${agentName}**, a headless worker agent.\n\n## Role\n- Execute assigned tasks efficiently\n- Report results back via task board updates\n- No personality needed — just get the job done\n\n## Rules\n- ALL work tracked on task board (tasks.dante.id)\n- NEVER delete tasks — change status instead\n- Update task status when done (done/failed)\n`);
+
+              // Write minimal AGENTS.md
+              fs.writeFileSync('/root/.openclaw/workspace/AGENTS.md', `# AGENTS.md - ${agentName}\n\n## Every Session\n1. Read SOUL.md\n2. Execute the assigned task\n3. Update task status on completion\n\n## Task Board\n- Supabase: lessxkxujvcmublgwdaa\n- Table: agent_tasks\n- NEVER delete tasks\n- Update status: in_progress → done/failed\n`);
+
+              // Register in agent_cards on startup
+              console.log('Config + init files written OK');
+          envFrom:
+            - secretRef:
+                name: worker-template-env
+          env:
+            - name: WORKER_NAME
+              value: "worker-template"
+            - name: WORKER_MODEL
+              value: "google/gemini-3-pro-preview"
+            - name: WORKER_CAPACITY
+              value: "3"
+            - name: WORKER_CAPABILITIES
+              value: "coding"
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
+      containers:
+        - name: openclaw
+          image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+          ports:
+            - containerPort: 18789
+          envFrom:
+            - secretRef:
+                name: worker-template-env
+          env:
+            - name: WORKER_NAME
+              value: "worker-template"
+            - name: WORKER_MODEL
+              value: "google/gemini-3-pro-preview"
+            - name: WORKER_CAPACITY
+              value: "3"
+            - name: WORKER_CAPABILITIES
+              value: "coding"
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    # Deregister from agent_cards on shutdown
+                    SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI"
+                    curl -s -X PATCH "https://lessxkxujvcmublgwdaa.supabase.co/rest/v1/agent_cards?id=eq.${WORKER_NAME}" \
+                      -H "apikey: ${SUPABASE_KEY}" \
+                      -H "Authorization: Bearer ${SUPABASE_KEY}" \
+                      -H "Content-Type: application/json" \
+                      -d "{\"status\":\"offline\",\"last_heartbeat\":\"$(date -u +%Y-%m-%dT%H:%M:%S+00:00)\"}" || true
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            tcpSocket:
+              port: 18789
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 18789
+            initialDelaySeconds: 15
+            periodSeconds: 5
+      volumes:
+        - name: data
+          emptyDir: {}
+      imagePullSecrets:
+        - name: ghcr-secret
