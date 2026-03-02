@@ -75,6 +75,138 @@ spec:
               fs.writeFileSync('/root/.openclaw/workspace/AGENTS.md', `# AGENTS.md - ${agentName}\n\n## Every Session\n1. Read SOUL.md\n2. Execute the assigned task\n3. Update task status on completion\n\n## Task Board\n- Supabase: lessxkxujvcmublgwdaa\n- Table: agent_tasks\n- NEVER delete tasks\n- Update status: in_progress → done/failed\n`);
 
               // Register in agent_cards on startup
+              // TOOLS.md
+              fs.writeFileSync('/root/.openclaw/workspace/TOOLS.md', [
+                '# TOOLS.md — ' + agentName,
+                '',
+                '## Workspace Repos',
+                '- `queue-dashboard/` — Dashboard frontend + Express backend (tasks.dante.id)',
+                '- `task-dispatcher/` — Task dispatcher service',
+                '- `dante-gitops/` — Kubernetes manifests + ArgoCD configs',
+                '',
+                '## Skills',
+                '- **coding-task**: Read `skills/coding-task/SKILL.md` for coding tasks (clone, branch, PR workflow)',
+                '',
+                '## Git',
+                '- GitHub org: dante-alpha-assistant',
+                '- Auth: GH_TOKEN env var (use with gh CLI or git remote URL)',
+                '- NEVER clone repos to /tmp/ — use workspace directory',
+              ].join('\n'));
+
+              // coding-task skill
+              const codingSkillDir = '/root/.openclaw/workspace/skills/coding-task';
+              fs.mkdirSync(codingSkillDir, { recursive: true });
+              fs.writeFileSync(codingSkillDir + '/SKILL.md', `# coding-task — Dispatched Coding Task Skill
+
+## When to Use
+This skill applies when you receive a message containing:
+- A JSON block with \\\`task_id\\\`, \\\`title\\\`, \\\`description\\\`
+- The header \\\`## Task Assigned:\\\`
+- A \\\`## Coding Task\\\` section with repo/branch info
+
+**If you see these markers, follow this skill step by step.**
+
+## Step 1: Parse the Task
+Extract from the JSON payload:
+- \\\`task_id\\\` — unique identifier (used for branch naming and status updates)
+- \\\`title\\\` — short task title (used for PR title)
+- \\\`description\\\` — full requirements
+- \\\`repo\\\` — target repository (from Coding Task section or description)
+- \\\`type\\\` — task type (coding, ops, etc.)
+- \\\`priority\\\` — urgency level
+
+Known repos (all under \\\`dante-alpha-assistant\\\`):
+| Repo | Path in workspace | Description |
+|------|-------------------|-------------|
+| \\\`queue-dashboard\\\` | \\\`queue-dashboard/\\\` | Dashboard frontend (Vite) + Express backend |
+| \\\`task-dispatcher\\\` | \\\`task-dispatcher/\\\` | Task dispatcher service (Node.js) |
+| \\\`dante-gitops\\\` | \\\`dante-gitops/\\\` | K8s manifests + ArgoCD configs |
+
+## Step 2: Setup Git
+\\\`\\\`\\\`bash
+git config --global user.email "dante-neo-assistant@proton.me"
+git config --global user.name "Neo"
+\\\`\\\`\\\`
+
+## Step 3: Prepare the Repo
+**CRITICAL: NEVER edit files without preparing the repo first. NEVER clone to /tmp/.**
+
+\\\`\\\`\\\`bash
+cd /root/.openclaw/workspace
+if [ -d "<repo-name>" ]; then
+  cd <repo-name>
+  git fetch origin
+  git checkout main
+  git pull origin main
+else
+  git clone https://x-access-token:\\\${GH_TOKEN}@github.com/dante-alpha-assistant/<repo-name>.git
+  cd <repo-name>
+fi
+\\\`\\\`\\\`
+
+**For multi-repo tasks:** Repeat for each repo involved.
+
+## Step 4: Create a Feature Branch
+\\\`\\\`\\\`bash
+git checkout -b feat/<short-kebab-description>
+\\\`\\\`\\\`
+
+Branch naming: \\\`feat/\\\`, \\\`fix/\\\`, \\\`chore/\\\`, \\\`refactor/\\\`
+
+## Step 5: Understand Before Editing
+1. **Read the relevant files** — \\\`ls\\\`, \\\`find\\\`, \\\`cat\\\` to understand structure
+2. **Check existing patterns** — follow the codebase's conventions
+3. **Verify file paths exist** — never edit a file without confirming it's there
+
+## Step 6: Make the Changes
+- Keep changes focused on the task requirements
+- Follow existing code style and patterns
+- Handle errors appropriately
+
+## Step 7: Build and Test
+\\\`\\\`\\\`bash
+# For queue-dashboard
+cd queue-dashboard && npm install && npm run build
+
+# For task-dispatcher
+cd task-dispatcher && npm install && node -e "require('./index.js')" 2>&1 | head -5
+
+# For dante-gitops — validate YAML (no build step)
+\\\`\\\`\\\`
+
+**Always verify your changes compile/build before committing.**
+
+## Step 8: Commit and Push
+\\\`\\\`\\\`bash
+git add -A
+git commit -m "<type>: <description>"
+git push -u origin HEAD
+\\\`\\\`\\\`
+
+## Step 9: Create a Pull Request
+\\\`\\\`\\\`bash
+gh pr create \\\\
+  --repo dante-alpha-assistant/<repo-name> \\\\
+  --title "<task title>" \\\\
+  --body "## Summary\\n<What changed and why>\\n\\n## Task\\n- ID: <task_id>" \\\\
+  --base main
+\\\`\\\`\\\`
+
+## Step 10: Update Task Status
+Use the curl commands provided in the dispatch message.
+- On success: include PR number and repo in result.summary
+- On failure: include specific error message
+
+## Common Mistakes to AVOID
+- ❌ Editing files without cloning/pulling the repo first
+- ❌ Cloning repos to \\\`/tmp/\\\` — always use workspace
+- ❌ Committing directly to \\\`main\\\`
+- ❌ Forgetting \\\`git pull\\\` before branching
+- ❌ Not building/testing before committing
+- ❌ Generic commit messages — be specific
+- ❌ Leaving task as \\\`in_progress\\\` — ALWAYS update status
+`);
+
               console.log('Config + init files written OK');
           envFrom:
             - secretRef:
