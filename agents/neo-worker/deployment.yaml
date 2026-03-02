@@ -280,9 +280,9 @@ spec:
               ].join('\n'));
 
               // coding-task skill
-              const skillDir = '/root/.openclaw/workspace/skills/coding-task';
-              fs.mkdirSync(skillDir, { recursive: true });
-              fs.writeFileSync(skillDir + '/SKILL.md', [
+              const codingSkillDir = '/root/.openclaw/workspace/skills/coding-task';
+              fs.mkdirSync(codingSkillDir, { recursive: true });
+              fs.writeFileSync(codingSkillDir + '/SKILL.md', [
                 '# coding-task Skill',
                 '',
                 'Use this skill when you receive a task from the dispatcher (contains a JSON block with task_id).',
