@@ -102,7 +102,6 @@ spec:
                   providers: {
                     anthropic: {
                       baseUrl: "https://api.anthropic.com",
-                      apiKey: e.ANTHROPIC_API_KEY || "",
                       models: [{ id: "claude-opus-4-6", name: "claude-opus-4-6", api: "anthropic-messages", reasoning: true, input: ["text","image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 }]
                     },
                     openrouter: {
