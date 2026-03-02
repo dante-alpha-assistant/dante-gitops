@@ -1,0 +1,242 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: beta-worker
+  namespace: agents
+  labels:
+    app: beta-worker
+    role: agent
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: beta-worker
+  template:
+    metadata:
+      labels:
+        app: beta-worker
+        role: agent
+    spec:
+      initContainers:
+        - name: init-tools
+          image: debian:bookworm-slim
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              apt-get update -qq && apt-get install -y -qq curl ca-certificates openssh-client > /dev/null 2>&1
+              KUBE_VER=v1.31.0
+              curl -sL "https://dl.k8s.io/release/${KUBE_VER}/bin/linux/amd64/kubectl" -o /tools/kubectl
+              chmod +x /tools/kubectl
+              echo "kubectl ${KUBE_VER} installed"
+              SSH_DIR=/pvc/.ssh
+              mkdir -p "$SSH_DIR"
+              if [ ! -f "$SSH_DIR/id_ed25519" ]; then
+                ssh-keygen -t ed25519 -f "$SSH_DIR/id_ed25519" -N "" -q
+              fi
+              ssh-keyscan github.com >> "$SSH_DIR/known_hosts" 2>/dev/null
+              sort -u "$SSH_DIR/known_hosts" -o "$SSH_DIR/known_hosts"
+              chmod 700 "$SSH_DIR"
+              chmod 600 "$SSH_DIR/id_ed25519"
+              chmod 644 "$SSH_DIR/id_ed25519.pub"
+              [ -f "$SSH_DIR/known_hosts" ] && chmod 644 "$SSH_DIR/known_hosts"
+              mkdir -p /ssh-out
+              cp "$SSH_DIR/id_ed25519" /ssh-out/id_ed25519
+              cp "$SSH_DIR/id_ed25519.pub" /ssh-out/id_ed25519.pub
+              [ -f "$SSH_DIR/known_hosts" ] && cp "$SSH_DIR/known_hosts" /ssh-out/known_hosts
+              chmod 600 /ssh-out/id_ed25519
+              chmod 644 /ssh-out/id_ed25519.pub
+              [ -f /ssh-out/known_hosts ] && chmod 644 /ssh-out/known_hosts
+              echo "Tools + SSH ready"
+          volumeMounts:
+            - name: tools-bin
+              mountPath: /tools
+            - name: data
+              mountPath: /pvc
+            - name: ssh-out
+              mountPath: /ssh-out
+        - name: init-config
+          image: node:22-bookworm-slim
+          command: ["node", "-e"]
+          args:
+            - |
+              const fs = require('fs');
+              const e = process.env;
+              const config = {
+                gateway: {
+                  port: 18789,
+                  mode: "local",
+                  bind: "lan",
+                  auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "" },
+                  tools: { allow: ["sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] },
+                  controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
+                },
+                models: {
+                  providers: {
+                    openrouter: {
+                      baseUrl: "https://openrouter.ai/api/v1",
+                      apiKey: e.OPENROUTER_API_KEY || "",
+                      models: [
+                        { id: "moonshotai/kimi-k2.5", name: "kimi-k2.5", api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 0.45, output: 2.25, cacheRead: 0.07, cacheWrite: 0 }, contextWindow: 262144, maxTokens: 8192 }
+                      ]
+                    }
+                  }
+                },
+                agents: {
+                  defaults: {
+                    model: { primary: "openrouter/moonshotai/kimi-k2.5" },
+                    workspace: "/root/.openclaw/workspace",
+                    compaction: { mode: "safeguard" },
+                    maxConcurrent: 4,
+                    subagents: { maxConcurrent: 8 },
+                    heartbeat: { every: "5m" }
+                  }
+                },
+                hooks: { enabled: true, token: "beta-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
+                tools: { sessions: { visibility: "all" } }
+              };
+              fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
+              fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
+              fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
+              // HEARTBEAT.md — agent card self-update
+              const hbPath = '/root/.openclaw/workspace/HEARTBEAT.md';
+              const agentId = 'beta-worker';
+              const sbUrl = 'https://lessxkxujvcmublgwdaa.supabase.co';
+              const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI';
+              const heartbeat = [
+                '# HEARTBEAT.md — Agent Card Self-Update',
+                '',
+                'Update your agent_card to signal liveness. Run this every heartbeat:',
+                '',
+                '```task',
+                'Run the following curl command to update your agent card (do NOT modify the command):',
+                '',
+                `curl -s -X PATCH "${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}" \\`,
+                `  -H "apikey: ${sbKey}" \\`,
+                `  -H "Authorization: Bearer ${sbKey}" \\`,
+                '  -H "Content-Type: application/json" \\',
+                `  -d '{"status":"online","last_heartbeat":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}'`,
+                '```',
+                '',
+                'If the agent_card has status "disabled", do NOT override it — skip the update and reply HEARTBEAT_OK.',
+                'If the curl succeeds, reply HEARTBEAT_OK.',
+              ].join('\\n');
+              if (!fs.existsSync(hbPath) || fs.readFileSync(hbPath, 'utf8').includes('Keep this file empty')) {
+                fs.writeFileSync(hbPath, heartbeat);
+              }
+              // Seed heartbeat cron job
+              const cronDir = '/root/.openclaw/cron';
+              const cronPath = cronDir + '/jobs.json';
+              fs.mkdirSync(cronDir, { recursive: true });
+              if (!fs.existsSync(cronPath)) {
+                const cronJobs = {
+                  version: 1,
+                  jobs: [{
+                    id: 'heartbeat-agent-card',
+                    name: 'heartbeat-agent-card',
+                    enabled: true,
+                    createdAtMs: Date.now(),
+                    updatedAtMs: Date.now(),
+                    schedule: { kind: 'every', everyMs: 300000, anchorMs: Date.now() },
+                    sessionTarget: 'isolated',
+                    wakeMode: 'now',
+                    payload: { kind: 'agentTurn', message: 'Run the heartbeat: update your agent card. Read HEARTBEAT.MD and follow it.', timeoutSeconds: 30 },
+                    delivery: { mode: 'none', channel: 'last' },
+                    state: { nextRunAtMs: Date.now() + 300000 }
+                  }]
+                };
+                fs.writeFileSync(cronPath, JSON.stringify(cronJobs, null, 2));
+              }
+              // SOUL.md — QA engineer persona
+              const soulPath = '/root/.openclaw/workspace/SOUL.md';
+              if (!fs.existsSync(soulPath)) {
+                fs.writeFileSync(soulPath, [
+                  '# SOUL.md — beta-worker',
+                  '',
+                  'You are **beta-worker**, a headless QA engineer agent.',
+                  '',
+                  '## Role',
+                  '- You execute automated QA tasks: testing, verification, validation.',
+                  '- You receive work via hooks/API only — no Discord, no direct chat.',
+                  '- You are methodical, thorough, and report results clearly.',
+                  '',
+                  '## Personality',
+                  '- Precise and detail-oriented.',
+                  '- You verify before you confirm.',
+                  '- You report failures honestly — no sugarcoating.',
+                  '- Concise reports: what was tested, what passed, what failed, evidence.',
+                  '',
+                  '## Boundaries',
+                  '- Headless only — no user-facing channels.',
+                  '- Focus on QA tasks exclusively.',
+                  '- Always update task status when done.',
+                ].join('\n'));
+              }
+              // IDENTITY.md
+              const idPath = '/root/.openclaw/workspace/IDENTITY.md';
+              if (!fs.existsSync(idPath)) {
+                fs.writeFileSync(idPath, [
+                  '# IDENTITY.md',
+                  '',
+                  '- **Name:** beta-worker',
+                  '- **Creature:** Headless QA agent',
+                  '- **Vibe:** Methodical, precise, no-nonsense',
+                  '- **Emoji:** 🔍',
+                ].join('\n'));
+              }
+              console.log('Config + HEARTBEAT.md + SOUL.md + IDENTITY.md written OK — NO DISCORD, hooks only');
+          envFrom:
+            - secretRef:
+                name: beta-worker-env
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
+      containers:
+        - name: openclaw
+          image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+          ports:
+            - containerPort: 18789
+          envFrom:
+            - secretRef:
+                name: beta-worker-env
+          env:
+            - name: PATH
+              value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
+            - name: tools-bin
+              mountPath: /tools
+              readOnly: true
+            - name: ssh-out
+              mountPath: /root/.ssh
+              readOnly: true
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          livenessProbe:
+            tcpSocket:
+              port: 18789
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 18789
+            initialDelaySeconds: 15
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: beta-worker-data
+        - name: tools-bin
+          emptyDir: {}
+        - name: ssh-out
+          emptyDir: {}
+      imagePullSecrets:
+        - name: ghcr-secret
