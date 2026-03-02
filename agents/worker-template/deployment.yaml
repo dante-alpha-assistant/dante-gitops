@@ -125,6 +125,10 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
+            - name: coding-task-skill
+              mountPath: /root/.openclaw/workspace/skills/coding-task/SKILL.md
+              subPath: SKILL.md
+              readOnly: true
           resources:
             requests:
               cpu: 250m
@@ -148,5 +152,8 @@ spec:
       volumes:
         - name: data
           emptyDir: {}
+        - name: coding-task-skill
+          configMap:
+            name: coding-task-skill
       imagePullSecrets:
         - name: ghcr-secret

@@ -203,6 +203,10 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
+            - name: coding-task-skill
+              mountPath: /root/.openclaw/workspace/skills/coding-task/SKILL.md
+              subPath: SKILL.md
+              readOnly: true
             - name: tools-bin
               mountPath: /tools
               readOnly: true
@@ -237,5 +241,8 @@ spec:
           emptyDir: {}
         - name: ssh-out
           emptyDir: {}
+        - name: coding-task-skill
+          configMap:
+            name: coding-task-skill
       imagePullSecrets:
         - name: ghcr-secret

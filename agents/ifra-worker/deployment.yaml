@@ -192,56 +192,10 @@ spec:
                 '- dante-gitops: https://github.com/dante-alpha-assistant/dante-gitops',
               ].join('\n'));
 
-              // coding-task skill
-              const skillDir = '/root/.openclaw/workspace/skills/coding-task';
-              fs.mkdirSync(skillDir, { recursive: true });
-              fs.writeFileSync(skillDir + '/SKILL.md', [
-                '# coding-task Skill',
-                '',
-                'Use this skill when you receive a task from the dispatcher (contains a JSON block with task_id).',
-                '',
-                '## Steps',
-                '',
-                '### 1. Parse the task',
-                '- Extract task_id, title, description, repo from the JSON payload',
-                '',
-                '### 2. Setup git',
-                'git config --global user.email "dante-neo-assistant@proton.me"',
-                'git config --global user.name "Neo"',
-                '',
-                '### 3. Clone or update the repo',
-                'If repo not yet cloned in workspace:',
-                '  cd /root/.openclaw/workspace',
-                '  git clone https://x-access-token:${GH_TOKEN}@github.com/{owner}/{repo}.git',
-                'If already cloned:',
-                '  cd /root/.openclaw/workspace/{repo}',
-                '  git checkout main && git pull origin main',
-                '',
-                '### 4. Create a feature branch',
-                '  git checkout -b feat/{short-task-description}',
-                '',
-                '### 5. Make changes',
-                '- Read existing code to understand the codebase',
-                '- Keep changes focused on what the task asks for',
-                '',
-                '### 6. Commit and push',
-                '  git add -A',
-                '  git commit -m "{type}: {description}"',
-                '  git push -u origin feat/{short-task-description}',
-                '',
-                '### 7. Create PR',
-                '  gh pr create --title "{task title}" --body "Closes task {task_id}" --base main',
-                '',
-                '### 8. Update task status',
-                'Use the curl command from the task payload. Include PR reference in result.',
-                '',
-                '## Important',
-                '- NEVER edit files without cloning the repo first',
-                '- NEVER commit to main directly',
-                '- If the task is unclear, set status to failed with explanation',
-              ].join('\n'));
+              // coding-task skill is now mounted from shared ConfigMap (coding-task-skill)
+              fs.mkdirSync('/root/.openclaw/workspace/skills/coding-task', { recursive: true });
 
-              console.log('Ifra-worker config + SOUL.md + coding-task skill written OK');
+              console.log('Ifra-worker config + SOUL.md written OK (coding-task skill via ConfigMap)');
           envFrom:
             - secretRef:
                 name: ifra-worker-env
@@ -259,6 +213,10 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
+            - name: coding-task-skill
+              mountPath: /root/.openclaw/workspace/skills/coding-task/SKILL.md
+              subPath: SKILL.md
+              readOnly: true
           resources:
             requests:
               cpu: 500m
@@ -283,5 +241,8 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: ifra-data
+        - name: coding-task-skill
+          configMap:
+            name: coding-task-skill
       imagePullSecrets:
         - name: ghcr-secret
