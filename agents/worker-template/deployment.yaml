@@ -74,6 +74,50 @@ spec:
               // Write minimal AGENTS.md
               fs.writeFileSync('/root/.openclaw/workspace/AGENTS.md', `# AGENTS.md - ${agentName}\n\n## Every Session\n1. Read SOUL.md\n2. Execute the assigned task\n3. Update task status on completion\n\n## Task Board\n- Supabase: lessxkxujvcmublgwdaa\n- Table: agent_tasks\n- NEVER delete tasks\n- Update status: in_progress → done/failed\n`);
 
+              // coding-task skill
+              const codingSkillDir = '/root/.openclaw/workspace/skills/coding-task';
+              fs.mkdirSync(codingSkillDir, { recursive: true });
+              fs.writeFileSync(codingSkillDir + '/SKILL.md', [
+                '# coding-task — Dispatched Coding Task Skill',
+                '',
+                '## When to Use',
+                'This skill applies when you receive a message containing:',
+                '- A JSON block with `task_id`, `title`, `type: "coding"`',
+                '- The header `## Task Assigned:`',
+                '- A `## Coding Task` section with repo/branch info',
+                '',
+                '## Step 1: Parse the Task',
+                'Extract `task_id`, `title`, `description`, `repo`, `priority` from the JSON.',
+                'Known repos (under `dante-alpha-assistant`):',
+                '- `queue-dashboard` — Dashboard frontend + Express backend',
+                '- `task-dispatcher` — Task dispatcher service',
+                '- `dante-gitops` — K8s manifests + ArgoCD configs',
+                '',
+                '## Step 2: Setup Git',
+                '```bash',
+                'git config --global user.email "dante-neo-assistant@proton.me"',
+                'git config --global user.name "Neo"',
+                '```',
+                '',
+                '## Step 3: Clone or Update Repo',
+                '**NEVER clone to /tmp/. Use /root/.openclaw/workspace/.**',
+                '```bash',
+                'cd /root/.openclaw/workspace',
+                'if [ -d "<repo>" ]; then cd <repo> && git fetch && git checkout main && git pull',
+                'else git clone https://x-access-token:${GH_TOKEN}@github.com/dante-alpha-assistant/<repo>.git && cd <repo>; fi',
+                '```',
+                '',
+                '## Step 4: Branch → Edit → Build → Commit → Push → PR',
+                '1. `git checkout -b feat/<short-description>`',
+                '2. Read existing code, make focused changes',
+                '3. `npm run build` if applicable',
+                '4. `git add -A && git commit -m "<type>: <desc>" && git push -u origin <branch>`',
+                '5. `gh pr create --repo dante-alpha-assistant/<repo> --title "<title>" --body "Task: <id>" --base main`',
+                '',
+                '## Step 5: Update Task Status',
+                'Use curl commands from dispatch message. Include PR number.',
+              ].join('\n'));
+
               // Register in agent_cards on startup
               console.log('Config + init files written OK');
           envFrom:
