@@ -9,4 +9,5 @@ resources:
   - ifra-worker/
   - eliseo/
   - neo-worker/
+  - beta-worker/
   - worker-template/
