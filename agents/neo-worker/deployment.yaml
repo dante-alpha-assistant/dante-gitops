@@ -163,7 +163,82 @@ spec:
                 };
                 fs.writeFileSync(cronPath, JSON.stringify(cronJobs, null, 2));
               }
-              console.log('Config + HEARTBEAT.md written OK — NO DISCORD, hooks only');
+              // --- task-worker skill ---
+              const skillDir = '/root/.openclaw/workspace/skills/task-worker';
+              fs.mkdirSync(skillDir, { recursive: true });
+              fs.writeFileSync(skillDir + '/SKILL.md', [
+                '# task-worker — Dispatched Task Execution Skill',
+                '',
+                '## When to Use',
+                'This skill applies to EVERY message from "Task Dispatcher" that contains a JSON task payload.',
+                'If you see `## Task Assigned:` in the message, follow this skill.',
+                '',
+                '## Workspace Repos (NEVER clone fresh!)',
+                'Your repos are already cloned in your workspace:',
+                '- `queue-dashboard/` — Dashboard frontend + Express backend (tasks.dante.id)',
+                '- `task-dispatcher/` — Task dispatcher service',
+                '- `dante-gitops/` — Kubernetes manifests + ArgoCD configs',
+                '',
+                '**ALWAYS work in these existing directories.** Do NOT `git clone` to `/tmp/` or anywhere else.',
+                '',
+                '## Git Workflow',
+                '1. `cd <repo>` (e.g., `cd queue-dashboard`)',
+                '2. `git fetch origin && git checkout main && git pull origin main`',
+                '3. `git checkout -b task/<task-id-first-8-chars>` (e.g., `task/4cc804fa`)',
+                '4. Make your changes',
+                '5. `git add -A && git commit -m "<type>: <description> [task:<id>]"`',
+                '6. `git push origin HEAD`',
+                '7. Create PR: `gh pr create --title "<title>" --body "Task: <id>\\n\\n<description>" --base main`',
+                '',
+                '## GitHub Auth',
+                '- `gh` CLI is available. Auth via `GH_TOKEN` env var (already set).',
+                '- If `gh` auth fails, use: `git remote set-url origin https://${GH_TOKEN}@github.com/dante-alpha-assistant/<repo>.git`',
+                '',
+                '## Build & Test',
+                '- Dashboard: `cd queue-dashboard && npm install && npm run build` (Vite frontend in `client/`)',
+                '- Dispatcher: `cd task-dispatcher && npm install && node index.js` (test startup only)',
+                '- Always run `npm install` if you change `package.json`',
+                '- Always test your changes compile/build before committing',
+                '',
+                '## Docker Build (for deployment)',
+                '- Dashboard has a `Dockerfile` — after pushing PR, the GitHub Actions workflow builds + pushes to GHCR',
+                '- ArgoCD Image Updater auto-deploys new images',
+                '',
+                '## Status Updates',
+                'The dispatch message includes curl commands for status updates. ALWAYS run them when done.',
+                'Include a meaningful summary in the `result.summary` field — what files changed, what the fix does.',
+                '',
+                '## Common Mistakes to Avoid',
+                '- ❌ `git clone` to `/tmp/` — repos are already in workspace',
+                '- ❌ Editing files that do not exist — always verify the file path with `ls` or `find` first',
+                '- ❌ Forgetting to `git pull` — always pull latest before branching',
+                '- ❌ Not testing — always `npm run build` or equivalent before committing',
+                '- ❌ Generic commit messages — include the task ID and what changed',
+                '- ❌ Leaving task in_progress — ALWAYS update to done or failed',
+              ].join('\n'));
+              // Write TOOLS.md with repo locations (always overwrite — this is infra truth)
+              fs.writeFileSync('/root/.openclaw/workspace/TOOLS.md', [
+                '# TOOLS.md — neo-worker',
+                '',
+                '## Workspace Repos',
+                '- `queue-dashboard/` — Dashboard frontend + Express backend (tasks.dante.id)',
+                '- `task-dispatcher/` — Task dispatcher service',  
+                '- `dante-gitops/` — Kubernetes manifests + ArgoCD configs',
+                '',
+                '## Skills',
+                '- **task-worker**: Read `skills/task-worker/SKILL.md` when handling dispatched tasks',
+                '',
+                '## Git',
+                '- GitHub org: dante-alpha-assistant',
+                '- Auth: GH_TOKEN env var (use with gh CLI or git remote URL)',
+                '- NEVER clone repos to /tmp/ — they are in your workspace already',
+                '',
+                '## K8s',
+                '- kubectl available at /tools/kubectl',
+                '- Cluster: k3s on 167.235.61.168',
+                '- Namespaces: agents, dev, infra, dante',
+              ].join('\n'));
+              console.log('Config + HEARTBEAT.md + task-worker skill + TOOLS.md written OK — NO DISCORD, hooks only');
           envFrom:
             - secretRef:
                 name: neo-worker-env
