@@ -296,103 +296,164 @@ spec:
                 '- dante-gitops: https://github.com/dante-alpha-assistant/dante-gitops',
               ].join('\n'));
 
-              // coding-task skill (enhanced)
+              // coding-task skill (v2 — synced with shared-skills/coding-task/SKILL.md)
               const codingSkillDir = '/root/.openclaw/workspace/skills/coding-task';
               fs.mkdirSync(codingSkillDir, { recursive: true });
               fs.writeFileSync(codingSkillDir + '/SKILL.md', `# coding-task — Dispatched Coding Task Skill
 
 ## When to Use
+
 This skill applies when you receive a message containing:
-- A JSON block with \\\`task_id\\\`, \\\`title\\\`, \\\`description\\\`
+- A JSON block with \\\`task_id\\\`, \\\`title\\\`, \\\`type: "coding"\\\`
 - The header \\\`## Task Assigned:\\\`
 - A \\\`## Coding Task\\\` section with repo/branch info
 
 **If you see these markers, follow this skill exactly.**
 
 ## Step 1: Parse the Task
+
 Extract from the JSON payload:
-- \\\`task_id\\\` — unique identifier
+- \\\`task_id\\\` — unique identifier (use first 8 chars for branch names)
 - \\\`title\\\` — short title
 - \\\`description\\\` — full requirements
-- \\\`repo\\\` — target repository URL (from Coding Task section)
+- \\\`acceptance_criteria\\\` — what "done" looks like (if provided)
+- \\\`repo\\\` — target repository (also check the Coding Task section)
+- \\\`priority\\\` — urgency level
 
-Known repos:
-- \\\`dante-alpha-assistant/queue-dashboard\\\` — Dashboard frontend + Express backend
-- \\\`dante-alpha-assistant/task-dispatcher\\\` — Task dispatcher service
-- \\\`dante-alpha-assistant/dante-gitops\\\` — K8s manifests + ArgoCD configs
+Known repos (all under \\\`dante-alpha-assistant\\\`):
+| Repo | Description | Build |
+|------|-------------|-------|
+| \\\`queue-dashboard\\\` | Dashboard frontend (Vite) + Express backend | \\\`npm run build\\\` |
+| \\\`task-dispatcher\\\` | Task dispatcher service (Node.js ESM) | \\\`node --check index.js\\\` |
+| \\\`dante-gitops\\\` | K8s manifests + ArgoCD configs | YAML validation |
+
+If the task mentions a repo not listed here, use the full GitHub URL from the description.
 
 ## Step 2: Setup Git
+
 \\\`\\\`\\\`bash
 git config --global user.email "dante-neo-assistant@proton.me"
 git config --global user.name "Neo"
 \\\`\\\`\\\`
 
-## Step 3: Clone or Update the Repo
-**CRITICAL: NEVER edit files without cloning first. NEVER clone to /tmp/.**
+## Step 3: Prepare the Repo
+
+**CRITICAL: Repos are pre-cloned in your workspace. NEVER clone to \\\`/tmp/\\\`.**
 
 \\\`\\\`\\\`bash
+cd /root/.openclaw/workspace/<repo-name>
+git fetch origin
+git checkout main
+git pull origin main
+\\\`\\\`\\\`
+
+If the repo dir doesn't exist (rare):
+\\\`\\\`\\\`bash
 cd /root/.openclaw/workspace
-if [ -d "<repo-name>" ]; then
-  cd <repo-name>
-  git fetch origin
-  git checkout main
-  git pull origin main
-else
-  git clone https://x-access-token:\\\${GH_TOKEN}@github.com/<org>/<repo-name>.git
-  cd <repo-name>
-fi
+git clone https://x-access-token:\\\${GH_TOKEN}@github.com/dante-alpha-assistant/<repo-name>.git
+cd <repo-name>
 \\\`\\\`\\\`
 
 ## Step 4: Create a Feature Branch
-Branch naming: \\\`feat/<short-kebab-description>\\\` or \\\`fix/<short-kebab-description>\\\`
+
 \\\`\\\`\\\`bash
-git checkout -b feat/<branch-name>
+git checkout -b feat/<short-kebab-description>
 \\\`\\\`\\\`
 
-## Step 5: Make the Changes
-- Read existing code first to understand patterns
-- Make focused changes matching the task description
-- Follow existing code style
-- Run build/lint if available (\\\`npm run build\\\`, \\\`npm run lint\\\`)
+Branch naming: \\\`feat/\\\`, \\\`fix/\\\`, \\\`refactor/\\\`, \\\`chore/\\\`
 
-## Step 6: Commit and Push
+## Step 5: Understand Before Editing
+
+Before making any changes:
+1. Read relevant files to understand existing patterns
+2. Check project structure (\\\`ls\\\`, \\\`find -name "*.js" | head -20\\\`)
+3. Look at recent commits (\\\`git log --oneline -10\\\`)
+4. Check \\\`package.json\\\` scripts if applicable
+
+## Step 6: Make the Changes
+
+- Keep changes **focused** on the task — don't refactor unrelated code
+- Follow existing code style and conventions
+- Add comments for complex logic
+- Handle errors properly
+
+## Step 7: Build and Test
+
+**Always verify before committing:**
+\\\`\\\`\\\`bash
+# Node.js projects
+npm install          # only if package.json changed
+npm run build        # if build script exists (queue-dashboard)
+node --check index.js  # task-dispatcher syntax check
+
+# K8s manifests
+cat <file>.yaml | python3 -c "import sys,yaml; yaml.safe_load(sys.stdin)"
+\\\`\\\`\\\`
+
+If build/lint fails, **fix the issues** before committing.
+
+## Step 8: Commit and Push
+
 \\\`\\\`\\\`bash
 git add -A
 git commit -m "<type>: <description>"
-git push -u origin <branch-name>
+git push -u origin feat/<branch-name>
 \\\`\\\`\\\`
-Types: feat, fix, refactor, chore, docs
 
-## Step 7: Create a PR
+Types: \\\`feat\\\`, \\\`fix\\\`, \\\`refactor\\\`, \\\`chore\\\`, \\\`docs\\\`
+
+## Step 9: Create a Pull Request
+
 \\\`\\\`\\\`bash
-gh pr create --repo <org>/<repo-name> \\\\
+gh pr create --repo dante-alpha-assistant/<repo-name> \\\\
   --title "<task title>" \\\\
-  --body "## Summary\\n<what changed and why>\\n\\n## Changes\\n- <list changes>\\n\\n## Task\\n- ID: <task_id>\\n- Priority: <priority>" \\\\
+  --body "## Summary
+<what changed and why>
+
+## Changes
+- <list key changes>
+
+## Task
+- ID: <task_id>
+- Priority: <priority>
+- Dispatched by: <dispatched_by>
+
+## Testing
+<how to verify>" \\\\
   --base main
 \\\`\\\`\\\`
 
-## Step 8: Update Task Status
-Use the curl commands from the dispatch message.
-- On success: include PR number and summary of changes
-- On failure: include specific error message
+## Step 10: Update Task Status
+
+Use the **curl commands from the dispatch message**. Replace placeholders:
+- \\\`DESCRIBE WHAT YOU DID\\\` → real summary including PR number and repo
+- Example: \\\`"Created feat/add-search for queue-dashboard. Added search filter with debounce. PR #29 on dante-alpha-assistant/queue-dashboard."\\\`
+
+**NEVER skip this step.**
 
 ## Multi-Repo Tasks
-Work on each repo sequentially. Create a PR in each. Reference related PRs in descriptions.
+
+Work on each repo sequentially. Create a PR in each. Reference related PRs. Report ALL PRs in status.
 
 ## Error Handling
-- Auth errors → check GH_TOKEN, report failure
-- Repo not found → report failure with URL
-- Unclear requirements → report failure with what's unclear
-- Build fails → include output in failure report
+
+| Error | Action |
+|-------|--------|
+| Auth errors | Verify GH_TOKEN. Report failure if missing. |
+| Repo not found | Double-check org/repo. Report failure with URL. |
+| Merge conflicts | Pull latest, rebase. Report failure if complex. |
+| Unclear requirements | Report failure explaining ambiguity. |
+| Build fails | Include output in failure report. |
 
 ## Common Mistakes to AVOID
-- ❌ Editing files without cloning the repo first
-- ❌ Cloning to /tmp/ — use workspace
-- ❌ Committing to main directly
-- ❌ Forgetting git pull before branching
+
+- ❌ Editing files without pulling latest first
+- ❌ Cloning to /tmp/ — always use workspace
+- ❌ Committing directly to main
 - ❌ Not running build/tests before committing
-- ❌ Generic commit messages
+- ❌ Generic commit messages — be specific
 - ❌ Leaving task in_progress — ALWAYS update status
+- ❌ Forgetting to include PR number in status update
 `);
 
               console.log('Config + HEARTBEAT.md + SOUL.md + coding-task skill written OK');
