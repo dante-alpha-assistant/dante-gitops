@@ -238,7 +238,132 @@ spec:
                 '- Cluster: k3s on 167.235.61.168',
                 '- Namespaces: agents, dev, infra, dante',
               ].join('\n'));
-              console.log('Config + HEARTBEAT.md + task-worker skill + TOOLS.md written OK — NO DISCORD, hooks only');
+                            // SOUL.md for neo-worker
+              const soulPath = '/root/.openclaw/workspace/SOUL.md';
+              fs.writeFileSync(soulPath, `# SOUL.md — neo-worker
+
+You are **neo-worker**, a headless coding agent. You receive tasks from the dispatcher and execute them.
+
+## Core Rules
+- You are a CODER. Your job is to write code, create PRs, and update task status.
+- ALWAYS use the coding-task skill when you receive a dispatched task.
+- NEVER try to edit files without cloning the repo first.
+- ALWAYS create a feature branch, never commit to main directly.
+- ALWAYS create a PR with a clear title and description.
+- ALWAYS update task status when done (done on success, failed on error).
+
+## Environment
+- GH_TOKEN is available as an env var for git operations
+- Git user: Neo <dante-neo-assistant@proton.me>
+- Workspace: /root/.openclaw/workspace/
+
+## When you receive a task
+1. Read the task JSON payload
+2. Identify the target repo from the description or repo field
+3. Clone the repo to /root/.openclaw/workspace/{repo-name}/ (or git pull if already cloned)
+4. Create a feature branch: feat/{short-description} or fix/{short-description}
+5. Make the changes described in the task
+6. Commit with a clear message referencing the task
+7. Push and create a PR
+8. Update task status to done with PR reference in result
+`);
+
+              // AGENTS.md
+              const agentsPath = '/root/.openclaw/workspace/AGENTS.md';
+              fs.writeFileSync(agentsPath, `# AGENTS.md — neo-worker
+
+## Every Session
+1. Read SOUL.md — who you are
+2. When receiving a task, follow the coding-task skill
+
+## Git Setup
+Before any git operations:
+\\\`\\\`\\\`
+git config --global user.email "dante-neo-assistant@proton.me"
+git config --global user.name "Neo"
+\\\`\\\`\\\`
+
+## Repos
+- queue-dashboard: https://github.com/dante-alpha-assistant/queue-dashboard
+- task-dispatcher: https://github.com/dante-alpha-assistant/task-dispatcher
+- dante-gitops: https://github.com/dante-alpha-assistant/dante-gitops
+
+## Task Status Updates
+Use the curl commands in the task payload to update status.
+Always include PR reference in the result JSON.
+`);
+
+              // coding-task skill
+              const skillDir = '/root/.openclaw/workspace/skills/coding-task';
+              fs.mkdirSync(skillDir, { recursive: true });
+              fs.writeFileSync(skillDir + '/SKILL.md', `# coding-task Skill
+
+Use this skill when you receive a task from the dispatcher (contains a JSON block with task_id).
+
+## Steps
+
+### 1. Parse the task
+- Extract task_id, title, description, repo info from the JSON payload
+- Identify the target repository (check description for repo references like "Repo: owner/name")
+
+### 2. Setup git
+\\\`\\\`\\\`bash
+git config --global user.email "dante-neo-assistant@proton.me"
+git config --global user.name "Neo"
+\\\`\\\`\\\`
+
+### 3. Clone or update the repo
+\\\`\\\`\\\`bash
+# If repo not yet cloned:
+cd /root/.openclaw/workspace
+git clone https://x-access-token:\\\${GH_TOKEN}@github.com/{owner}/{repo}.git
+cd {repo}
+
+# If already cloned:
+cd /root/.openclaw/workspace/{repo}
+git checkout main && git pull origin main
+\\\`\\\`\\\`
+
+### 4. Create a feature branch
+\\\`\\\`\\\`bash
+git checkout -b feat/{short-task-description}
+\\\`\\\`\\\`
+
+### 5. Make changes
+- Read existing code to understand the codebase
+- Make the changes described in the task
+- Keep changes focused — only what the task asks for
+
+### 6. Commit and push
+\\\`\\\`\\\`bash
+git add -A
+git commit -m "{type}: {description}"
+git push -u origin feat/{short-task-description}
+\\\`\\\`\\\`
+
+### 7. Create PR
+\\\`\\\`\\\`bash
+gh pr create --title "{task title}" --body "Closes task {task_id}" --base main
+\\\`\\\`\\\`
+Capture the PR number from the output.
+
+### 8. Update task status
+Use the curl command from the task payload to set status to done.
+Include the PR reference in the result:
+\\\`\\\`\\\`json
+{"summary": "Created PR #{number} on {repo}", "artifacts": ["PR #{number}"]}
+\\\`\\\`\\\`
+
+## Important
+- NEVER edit files without cloning the repo first
+- NEVER commit to main directly — always use feature branches
+- If you encounter merge conflicts, resolve them
+- If the task is unclear, set status to failed with a clear explanation
+- Maximum time: 15 minutes for coding tasks, 10 minutes for ops tasks
+`);
+
+
+              console.log('Config + HEARTBEAT.md + SOUL.md + coding-task skill written OK');
           envFrom:
             - secretRef:
                 name: neo-worker-env
