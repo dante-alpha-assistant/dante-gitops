@@ -197,12 +197,14 @@ spec:
               memory: 256Mi
             limits:
               cpu: 1000m
-              memory: 1Gi
+              memory: 2Gi
           livenessProbe:
             tcpSocket:
               port: 18789
-            initialDelaySeconds: 30
+            initialDelaySeconds: 120
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
           readinessProbe:
             tcpSocket:
               port: 18789
