@@ -1,0 +1,5 @@
+apiVersion: kustomize.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - manifests.yaml

@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: langfuse
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dante-alpha-assistant/dante-gitops.git
+    targetRevision: main
+    path: langfuse
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: langfuse
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
