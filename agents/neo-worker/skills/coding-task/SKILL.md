@@ -1,124 +1,168 @@
-# Coding Task Skill
+# coding-task — Dispatched Coding Task Skill
 
-This skill handles dispatched coding tasks from the task-dispatcher. Follow these steps exactly.
-
-## Detection
+## When to Use
 
 This skill applies when you receive a message containing:
-- A JSON block with `task_id`, `title`, `description`, `type: "coding"`
+- A JSON block with `task_id`, `title`, `description`
 - The header `## Task Assigned:`
-- Instructions to update task status via Supabase API
+- A `## Coding Task` section with repo/branch info
 
-## Workflow
+**If you see these markers, follow this skill step by step.**
 
-### 1. Parse the Task
+## Step 1: Parse the Task
 
 Extract from the JSON payload:
-- `task_id` — unique task identifier
-- `title` — short task title
-- `description` — full task description with requirements
-- `type` — should be "coding"
+- `task_id` — unique identifier (used for branch naming and status updates)
+- `title` — short task title (used for PR title)
+- `description` — full requirements
+- `repo` — target repository (from Coding Task section or description)
+- `type` — task type (coding, ops, etc.)
 - `priority` — urgency level
-- `repo` — target repository (if provided)
-- `branch` — branch convention (if provided)
 
-If `repo` is not in the payload, identify it from the description. Known repos:
-- `dante-alpha-assistant/queue-dashboard` — Dashboard frontend + Express backend
-- `dante-alpha-assistant/task-dispatcher` — Task dispatcher service  
-- `dante-alpha-assistant/dante-gitops` — Kubernetes manifests + ArgoCD configs
+Known repos (all under `dante-alpha-assistant`):
+| Repo | Path in workspace | Description |
+|------|-------------------|-------------|
+| `queue-dashboard` | `queue-dashboard/` | Dashboard frontend (Vite) + Express backend |
+| `task-dispatcher` | `task-dispatcher/` | Task dispatcher service (Node.js) |
+| `dante-gitops` | `dante-gitops/` | K8s manifests + ArgoCD configs |
 
-### 2. Clone or Update the Repo
+## Step 2: Setup Git
 
-**CRITICAL: Never edit files without cloning first. Never clone to /tmp/.**
+```bash
+git config --global user.email "dante-neo-assistant@proton.me"
+git config --global user.name "Neo"
+```
+
+## Step 3: Prepare the Repo
+
+**CRITICAL: NEVER edit files without preparing the repo first. NEVER clone to /tmp/.**
 
 ```bash
 cd /root/.openclaw/workspace
 
-# If repo dir exists, pull latest
+# If repo exists in workspace, update it
 if [ -d "<repo-name>" ]; then
   cd <repo-name>
   git fetch origin
   git checkout main
   git pull origin main
 else
-  git clone https://github.com/<org>/<repo-name>.git
+  # Clone fresh — use GH_TOKEN for auth
+  git clone https://x-access-token:${GH_TOKEN}@github.com/dante-alpha-assistant/<repo-name>.git
   cd <repo-name>
 fi
 ```
 
-### 3. Create a Feature Branch
+**For multi-repo tasks:** Repeat for each repo involved.
 
-Branch naming: `feat/<short-kebab-description>` or `fix/<short-kebab-description>`
+## Step 4: Create a Feature Branch
 
 ```bash
-git checkout -b feat/<branch-name>
+# Use task_id first 8 chars for uniqueness
+git checkout -b feat/<short-kebab-description>
 ```
 
-### 4. Make the Changes
+Branch naming conventions:
+- `feat/<description>` — new features
+- `fix/<description>` — bug fixes
+- `chore/<description>` — maintenance, config changes
+- `refactor/<description>` — code restructuring
 
-- Read existing code to understand patterns before editing
-- Make the changes described in the task description
-- Follow existing code style and conventions
-- Test if possible (run linters, type checks, etc.)
+## Step 5: Understand Before Editing
 
-### 5. Commit and Push
+Before making changes:
+1. **Read the relevant files** — `ls`, `find`, `cat` to understand structure
+2. **Check existing patterns** — follow the codebase's conventions
+3. **Verify file paths exist** — never edit a file without confirming it's there
+
+## Step 6: Make the Changes
+
+- Keep changes focused on the task requirements
+- Follow existing code style and patterns
+- Add comments for non-obvious logic
+- Handle errors appropriately
+
+## Step 7: Build and Test
+
+```bash
+# For queue-dashboard
+cd queue-dashboard && npm install && npm run build
+
+# For task-dispatcher
+cd task-dispatcher && npm install && node -e "require('./index.js')" 2>&1 | head -5
+
+# For dante-gitops — validate YAML
+# (no build step, just check syntax)
+```
+
+**Always verify your changes compile/build before committing.**
+
+## Step 8: Commit and Push
 
 ```bash
 git add -A
-git commit -m "<type>: <description> (task: <task_id_short>)"
-git push origin <branch-name>
+git commit -m "<type>: <description>"
+git push -u origin HEAD
 ```
 
-Commit message types: `feat`, `fix`, `refactor`, `chore`, `docs`
+Commit message format: `<type>: <description>` 
+Types: `feat`, `fix`, `refactor`, `chore`, `docs`
 
-### 6. Create a Pull Request
-
-Use the `gh` CLI:
+## Step 9: Create a Pull Request
 
 ```bash
 gh pr create \
-  --repo <org>/<repo-name> \
+  --repo dante-alpha-assistant/<repo-name> \
   --title "<task title>" \
   --body "## Summary
-<describe what changed and why>
+<What changed and why>
 
 ## Changes
-- <list key changes>
+- <List key changes>
 
 ## Task
-- ID: <task_id>
-- Priority: <priority>
-- Dispatched by: <dispatched_by>
+- **ID:** <task_id>
+- **Priority:** <priority>
+- **Dispatched by:** <dispatched_by>
 
 ## Testing
-<describe how to verify>" \
+<How to verify the changes>" \
   --base main
 ```
 
-### 7. Update Task Status
+**For multi-repo tasks:** Create a PR in each repo, cross-reference them.
 
-**On success** — use the curl command provided in the dispatch message. Replace the summary with what you actually did, including the PR number.
+## Step 10: Update Task Status
 
-**On failure** — use the failure curl command. Include the specific error message.
+Use the curl commands provided in the dispatch message.
 
-## Multi-Repo Tasks
+**On success:** Include in `result.summary`:
+- PR number and repo (e.g., "PR #29 on queue-dashboard")
+- Brief description of what changed
+- List of files modified
 
-If the task spans multiple repos:
-1. Work on each repo sequentially
-2. Create a PR in each repo
-3. Reference related PRs in each PR description
-4. Report all PRs in the task status update
+**On failure:** Include in `error`:
+- Specific error message
+- What step failed
+- What you tried
 
 ## Error Handling
 
-- If `git push` fails with auth errors: check GH_TOKEN is set, report failure
-- If the repo doesn't exist: report failure with the repo URL tried
-- If you can't understand the requirements: report failure with what's unclear
-- If tests fail: include test output in the failure report
+| Error | Action |
+|-------|--------|
+| `git push` auth failure | Verify `GH_TOKEN`, try `git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/...` |
+| Repo not found | Report failure with the URL attempted |
+| Build fails | Include build output in failure report |
+| Unclear requirements | Report failure explaining what's ambiguous |
+| Merge conflicts | Report failure, list conflicting files |
 
-## Environment
+## Common Mistakes to AVOID
 
-- `GH_TOKEN` — GitHub personal access token (available as env var)
-- Git user: `Neo <dante-neo-assistant@proton.me>`
-- Workspace: `/root/.openclaw/workspace/`
-- kubectl: `/tools/kubectl`
+- ❌ Editing files without cloning/pulling the repo first
+- ❌ Cloning repos to `/tmp/` — always use workspace
+- ❌ Committing directly to `main`
+- ❌ Forgetting `git pull` before branching (causes conflicts)
+- ❌ Not building/testing before committing
+- ❌ Generic commit messages — be specific
+- ❌ Leaving task as `in_progress` — ALWAYS update status to done or failed
+- ❌ Assuming file paths — always `ls`/`find` to verify
