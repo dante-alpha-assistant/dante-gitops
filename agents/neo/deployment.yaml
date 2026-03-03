@@ -156,8 +156,7 @@ spec:
                 fs.writeFileSync(authPath, JSON.stringify(existing, null, 2));
                 console.log('auth-profiles.json written from ANTHROPIC_API_KEY');
               }
-
-console.log('Config written OK');
+              console.log('Config written OK');
           envFrom:
             - secretRef:
                 name: neo-env

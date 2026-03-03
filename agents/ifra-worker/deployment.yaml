@@ -259,7 +259,7 @@ spec:
                 console.log('auth-profiles.json written from ANTHROPIC_API_KEY');
               }
 
-console.log('Ifra-worker config + SOUL.md + coding-task skill written OK');
+              console.log('Ifra-worker config + SOUL.md + coding-task skill written OK');
           envFrom:
             - secretRef:
                 name: ifra-worker-env
