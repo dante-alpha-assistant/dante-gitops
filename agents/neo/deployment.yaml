@@ -139,7 +139,25 @@ spec:
               fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
               fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
               fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
-              console.log('Config written OK');
+              
+              // --- Write auth-profiles.json from env var (gitops-managed) ---
+              const authDir = '/root/.openclaw/agents/main/agent';
+              const authPath = authDir + '/auth-profiles.json';
+              fs.mkdirSync(authDir, { recursive: true });
+              const apiKey = e.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '';
+              if (apiKey) {
+                let existing = {};
+                try { existing = JSON.parse(fs.readFileSync(authPath, 'utf8')); } catch(_) {}
+                existing.version = 1;
+                existing.profiles = existing.profiles || {};
+                existing.profiles['anthropic:default'] = { type: 'token', provider: 'anthropic', token: apiKey };
+                existing.lastGood = existing.lastGood || {};
+                existing.lastGood.anthropic = 'anthropic:default';
+                fs.writeFileSync(authPath, JSON.stringify(existing, null, 2));
+                console.log('auth-profiles.json written from ANTHROPIC_API_KEY');
+              }
+
+console.log('Config written OK');
           envFrom:
             - secretRef:
                 name: neo-env
