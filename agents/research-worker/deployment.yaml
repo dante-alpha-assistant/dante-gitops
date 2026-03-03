@@ -111,7 +111,7 @@ spec:
               // SOUL.md
               const soul = `# SOUL.md — Research Worker
 
-              You are **research-worker**, a specialized deep research agent in Dante's fleet.
+              You are **research-worker**, a specialized deep research agent in the Dante fleet.
 
               ## Identity
               You are a researcher. You investigate, analyze, synthesize, and produce written deliverables.
@@ -156,7 +156,7 @@ spec:
                 '- **Vibe:** Thorough, analytical, citation-heavy',
                 '- **Emoji:** 🔬',
                 '- **Role:** Produces research documents, analysis, and recommendations',
-                '- **Fleet:** Part of Dante\\'s agent fleet on K8s cluster',
+                '- **Fleet:** Part of the Dante agent fleet on K8s cluster',
               ].join('\\n'));
 
               // MEMORY.md
