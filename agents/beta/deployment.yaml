@@ -85,7 +85,7 @@ spec:
                 hooks: { enabled: true, token: "beta-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
                 tools: { sessions: { visibility: "all" } },
                 plugins: { allow: ["diagnostics-otel"], entries: { "diagnostics-otel": { enabled: !!langfuseAuth } } },
-                diagnostics: langfuseAuth ? { enabled: true, otel: { enabled: true, endpoint: "https://us.cloud.langfuse.com/api/public/otel", protocol: "http/protobuf", serviceName: "openclaw-beta", headers: { Authorization: "Basic " + langfuseAuth }, traces: true, metrics: true, logs: false, sampleRate: 1.0, flushIntervalMs: 30000 } } : { enabled: false }
+                diagnostics: langfuseAuth ? { enabled: true, otel: { enabled: true, endpoint: (e.LANGFUSE_BASEURL || "https://cloud.langfuse.com/api/public/otel"), protocol: "http/protobuf", serviceName: "openclaw-beta", headers: { Authorization: "Basic " + langfuseAuth }, traces: true, metrics: true, logs: false, sampleRate: 1.0, flushIntervalMs: 30000 } } : { enabled: false }
               };
               fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
               fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
@@ -95,7 +95,9 @@ spec:
             - secretRef:
                 name: beta-env
             - secretRef:
-                name: langfuse-env
+                name: langfuse-secret
+            - configMapRef:
+                name: langfuse-config
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
@@ -108,7 +110,9 @@ spec:
             - secretRef:
                 name: beta-env
             - secretRef:
-                name: langfuse-env
+                name: langfuse-secret
+            - configMapRef:
+                name: langfuse-config
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
