@@ -242,7 +242,6 @@ spec:
                 '',
                 '## Skills',
                 '- **task-worker**: Read `skills/task-worker/SKILL.md` when handling dispatched tasks',
-                '- **coding-task**: Read `skills/coding-task/SKILL.md` for coding tasks (clone, branch, PR workflow)',
                 '',
                 '## Git',
                 '- GitHub org: dante-alpha-assistant',
@@ -263,8 +262,7 @@ spec:
                 '',
                 '## Core Rules',
                 '- You are a CODER. Your job is to write code, create PRs, and update task status.',
-                '- ALWAYS read and follow `skills/coding-task/SKILL.md` when you receive a dispatched task.',
-                '- Look for `## Coding Task` section in dispatch messages — it has repo URL and branch convention.',
+                '- ALWAYS use the coding-task skill when you receive a dispatched task.',
                 '- NEVER try to edit files without cloning the repo first.',
                 '- ALWAYS create a feature branch, never commit to main directly.',
                 '- ALWAYS create a PR with a clear title and description.',
@@ -296,104 +294,54 @@ spec:
                 '- dante-gitops: https://github.com/dante-alpha-assistant/dante-gitops',
               ].join('\n'));
 
-              // coding-task skill (enhanced)
+              // coding-task skill
               const codingSkillDir = '/root/.openclaw/workspace/skills/coding-task';
               fs.mkdirSync(codingSkillDir, { recursive: true });
-              fs.writeFileSync(codingSkillDir + '/SKILL.md', `# coding-task — Dispatched Coding Task Skill
-
-## When to Use
-This skill applies when you receive a message containing:
-- A JSON block with \\\`task_id\\\`, \\\`title\\\`, \\\`description\\\`
-- The header \\\`## Task Assigned:\\\`
-- A \\\`## Coding Task\\\` section with repo/branch info
-
-**If you see these markers, follow this skill exactly.**
-
-## Step 1: Parse the Task
-Extract from the JSON payload:
-- \\\`task_id\\\` — unique identifier
-- \\\`title\\\` — short title
-- \\\`description\\\` — full requirements
-- \\\`repo\\\` — target repository URL (from Coding Task section)
-
-Known repos:
-- \\\`dante-alpha-assistant/queue-dashboard\\\` — Dashboard frontend + Express backend
-- \\\`dante-alpha-assistant/task-dispatcher\\\` — Task dispatcher service
-- \\\`dante-alpha-assistant/dante-gitops\\\` — K8s manifests + ArgoCD configs
-
-## Step 2: Setup Git
-\\\`\\\`\\\`bash
-git config --global user.email "dante-neo-assistant@proton.me"
-git config --global user.name "Neo"
-\\\`\\\`\\\`
-
-## Step 3: Clone or Update the Repo
-**CRITICAL: NEVER edit files without cloning first. NEVER clone to /tmp/.**
-
-\\\`\\\`\\\`bash
-cd /root/.openclaw/workspace
-if [ -d "<repo-name>" ]; then
-  cd <repo-name>
-  git fetch origin
-  git checkout main
-  git pull origin main
-else
-  git clone https://x-access-token:\\\${GH_TOKEN}@github.com/<org>/<repo-name>.git
-  cd <repo-name>
-fi
-\\\`\\\`\\\`
-
-## Step 4: Create a Feature Branch
-Branch naming: \\\`feat/<short-kebab-description>\\\` or \\\`fix/<short-kebab-description>\\\`
-\\\`\\\`\\\`bash
-git checkout -b feat/<branch-name>
-\\\`\\\`\\\`
-
-## Step 5: Make the Changes
-- Read existing code first to understand patterns
-- Make focused changes matching the task description
-- Follow existing code style
-- Run build/lint if available (\\\`npm run build\\\`, \\\`npm run lint\\\`)
-
-## Step 6: Commit and Push
-\\\`\\\`\\\`bash
-git add -A
-git commit -m "<type>: <description>"
-git push -u origin <branch-name>
-\\\`\\\`\\\`
-Types: feat, fix, refactor, chore, docs
-
-## Step 7: Create a PR
-\\\`\\\`\\\`bash
-gh pr create --repo <org>/<repo-name> \\\\
-  --title "<task title>" \\\\
-  --body "## Summary\\n<what changed and why>\\n\\n## Changes\\n- <list changes>\\n\\n## Task\\n- ID: <task_id>\\n- Priority: <priority>" \\\\
-  --base main
-\\\`\\\`\\\`
-
-## Step 8: Update Task Status
-Use the curl commands from the dispatch message.
-- On success: include PR number and summary of changes
-- On failure: include specific error message
-
-## Multi-Repo Tasks
-Work on each repo sequentially. Create a PR in each. Reference related PRs in descriptions.
-
-## Error Handling
-- Auth errors → check GH_TOKEN, report failure
-- Repo not found → report failure with URL
-- Unclear requirements → report failure with what's unclear
-- Build fails → include output in failure report
-
-## Common Mistakes to AVOID
-- ❌ Editing files without cloning the repo first
-- ❌ Cloning to /tmp/ — use workspace
-- ❌ Committing to main directly
-- ❌ Forgetting git pull before branching
-- ❌ Not running build/tests before committing
-- ❌ Generic commit messages
-- ❌ Leaving task in_progress — ALWAYS update status
-`);
+              fs.writeFileSync(codingSkillDir + '/SKILL.md', [
+                '# coding-task Skill',
+                '',
+                'Use this skill when you receive a task from the dispatcher (contains a JSON block with task_id).',
+                '',
+                '## Steps',
+                '',
+                '### 1. Parse the task',
+                '- Extract task_id, title, description, repo from the JSON payload',
+                '',
+                '### 2. Setup git',
+                'git config --global user.email "dante-neo-assistant@proton.me"',
+                'git config --global user.name "Neo"',
+                '',
+                '### 3. Clone or update the repo',
+                'If repo not yet cloned in workspace:',
+                '  cd /root/.openclaw/workspace',
+                '  git clone https://x-access-token:${GH_TOKEN}@github.com/{owner}/{repo}.git',
+                'If already cloned:',
+                '  cd /root/.openclaw/workspace/{repo}',
+                '  git checkout main && git pull origin main',
+                '',
+                '### 4. Create a feature branch',
+                '  git checkout -b feat/{short-task-description}',
+                '',
+                '### 5. Make changes',
+                '- Read existing code to understand the codebase',
+                '- Keep changes focused on what the task asks for',
+                '',
+                '### 6. Commit and push',
+                '  git add -A',
+                '  git commit -m "{type}: {description}"',
+                '  git push -u origin feat/{short-task-description}',
+                '',
+                '### 7. Create PR',
+                '  gh pr create --title "{task title}" --body "Closes task {task_id}" --base main',
+                '',
+                '### 8. Update task status',
+                'Use the curl command from the task payload. Include PR reference in result.',
+                '',
+                '## Important',
+                '- NEVER edit files without cloning the repo first',
+                '- NEVER commit to main directly',
+                '- If the task is unclear, set status to failed with explanation',
+              ].join('\n'));
 
               console.log('Config + HEARTBEAT.md + SOUL.md + coding-task skill written OK');
           envFrom:
