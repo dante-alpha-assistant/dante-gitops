@@ -70,6 +70,29 @@ spec:
               fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
               fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
               fs.mkdirSync('/root/.openclaw/agents/main/agent', { recursive: true });
+              // --- Langfuse Cloud OTLP tracing ---
+              if (e.LANGFUSE_PUBLIC_KEY && e.LANGFUSE_SECRET_KEY && !e.LANGFUSE_PUBLIC_KEY.includes('REPLACE_ME')) {
+                const lfAuth = Buffer.from(e.LANGFUSE_PUBLIC_KEY + ':' + e.LANGFUSE_SECRET_KEY).toString('base64');
+                const lfBase = e.LANGFUSE_BASEURL || 'https://cloud.langfuse.com';
+                config.plugins = config.plugins || { allow: [], entries: {} };
+                config.plugins.allow = [...new Set([...(config.plugins.allow || []), 'diagnostics-otel'])];
+                config.plugins.entries = config.plugins.entries || {};
+                config.plugins.entries['diagnostics-otel'] = { enabled: true };
+                config.diagnostics = {
+                  enabled: true,
+                  otel: {
+                    enabled: true,
+                    endpoint: lfBase + '/api/public/otel',
+                    headers: { Authorization: 'Basic ' + lfAuth },
+                    serviceName: 'openclaw-ifra-worker',
+                    traces: true,
+                    metrics: true,
+                    logs: false,
+                    sampleRate: 1.0,
+                    flushIntervalMs: 30000
+                  }
+                };
+              }
               fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
 
               // Auth profiles
@@ -263,6 +286,8 @@ spec:
           envFrom:
             - secretRef:
                 name: ifra-worker-env
+            - secretRef:
+                name: langfuse-credentials
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
@@ -274,6 +299,8 @@ spec:
           envFrom:
             - secretRef:
                 name: ifra-worker-env
+            - secretRef:
+                name: langfuse-credentials
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
