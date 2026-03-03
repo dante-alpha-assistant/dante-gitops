@@ -81,6 +81,25 @@ spec:
                     subagents: { maxConcurrent: 8 }
                   }
                 },
+                plugins: {
+                  allow: ["diagnostics-otel"],
+                  entries: { "diagnostics-otel": { enabled: true } }
+                },
+                diagnostics: {
+                  enabled: true,
+                  otel: {
+                    enabled: true,
+                    endpoint: (e.LANGFUSE_BASEURL || "https://cloud.langfuse.com") + "/api/public/otel",
+                    protocol: "http/protobuf",
+                    serviceName: "mu",
+                    traces: true,
+                    metrics: true,
+                    logs: false,
+                    sampleRate: 1.0,
+                    flushIntervalMs: 30000,
+                    headers: { "Authorization": "Basic " + (e.LANGFUSE_OTEL_AUTH || "") }
+                  }
+                },
                 hooks: { enabled: true, token: "mu-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
                 tools: { sessions: { visibility: "all" } }
               };
@@ -91,6 +110,8 @@ spec:
           envFrom:
             - secretRef:
                 name: mu-env
+            - secretRef:
+                name: langfuse-credentials
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
@@ -102,6 +123,8 @@ spec:
           envFrom:
             - secretRef:
                 name: mu-env
+            - secretRef:
+                name: langfuse-credentials
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
