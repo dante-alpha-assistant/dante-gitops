@@ -378,6 +378,11 @@ spec:
           env:
             - name: PATH
               value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: neo-worker-env
+                  key: ANTHROPIC_API_KEY
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
