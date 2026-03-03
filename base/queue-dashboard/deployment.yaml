@@ -19,6 +19,9 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: queue-dashboard-env
           env:
             - name: SUPABASE_URL
               value: "https://lessxkxujvcmublgwdaa.supabase.co"
