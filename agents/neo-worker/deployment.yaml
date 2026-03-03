@@ -108,7 +108,26 @@ spec:
                   }
                 },
                 hooks: { enabled: true, token: "neo-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
-                tools: { sessions: { visibility: "all" } }
+                tools: { sessions: { visibility: "all" } },
+                plugins: {
+                  allow: ["diagnostics-otel"],
+                  entries: { "diagnostics-otel": { enabled: true } }
+                },
+                diagnostics: {
+                  enabled: true,
+                  otel: {
+                    enabled: !!(e.LANGFUSE_PUBLIC_KEY && e.LANGFUSE_SECRET_KEY),
+                    endpoint: e.LANGFUSE_BASEURL || "https://cloud.langfuse.com/api/public/otel",
+                    protocol: "http/protobuf",
+                    serviceName: "neo-worker",
+                    headers: (e.LANGFUSE_PUBLIC_KEY && e.LANGFUSE_SECRET_KEY) ? { Authorization: "Basic " + Buffer.from(e.LANGFUSE_PUBLIC_KEY + ":" + e.LANGFUSE_SECRET_KEY).toString("base64") } : {},
+                    traces: true,
+                    metrics: true,
+                    logs: false,
+                    sampleRate: 1.0,
+                    flushIntervalMs: 30000
+                  }
+                }
               };
               fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
               fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
@@ -364,6 +383,10 @@ spec:
           envFrom:
             - secretRef:
                 name: neo-worker-env
+            - secretRef:
+                name: langfuse-secret
+            - configMapRef:
+                name: langfuse-config
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
@@ -375,6 +398,10 @@ spec:
           envFrom:
             - secretRef:
                 name: neo-worker-env
+            - secretRef:
+                name: langfuse-secret
+            - configMapRef:
+                name: langfuse-config
           env:
             - name: PATH
               value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"

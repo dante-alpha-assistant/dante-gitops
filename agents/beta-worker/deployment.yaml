@@ -91,7 +91,26 @@ spec:
                   }
                 },
                 hooks: { enabled: true, token: "beta-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
-                tools: { sessions: { visibility: "all" } }
+                tools: { sessions: { visibility: "all" } },
+                plugins: {
+                  allow: ["diagnostics-otel"],
+                  entries: { "diagnostics-otel": { enabled: true } }
+                },
+                diagnostics: {
+                  enabled: true,
+                  otel: {
+                    enabled: !!(e.LANGFUSE_PUBLIC_KEY && e.LANGFUSE_SECRET_KEY),
+                    endpoint: e.LANGFUSE_BASEURL || "https://cloud.langfuse.com/api/public/otel",
+                    protocol: "http/protobuf",
+                    serviceName: "beta-worker",
+                    headers: (e.LANGFUSE_PUBLIC_KEY && e.LANGFUSE_SECRET_KEY) ? { Authorization: "Basic " + Buffer.from(e.LANGFUSE_PUBLIC_KEY + ":" + e.LANGFUSE_SECRET_KEY).toString("base64") } : {},
+                    traces: true,
+                    metrics: true,
+                    logs: false,
+                    sampleRate: 1.0,
+                    flushIntervalMs: 30000
+                  }
+                }
               };
               fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
               fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
@@ -174,6 +193,11 @@ spec:
                 secretKeyRef:
                   name: beta-worker-env
                   key: OPENCLAW_GATEWAY_TOKEN
+          envFrom:
+            - secretRef:
+                name: langfuse-secret
+            - configMapRef:
+                name: langfuse-config
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
@@ -182,6 +206,11 @@ spec:
           image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
           ports:
             - containerPort: 18789
+          envFrom:
+            - secretRef:
+                name: langfuse-secret
+            - configMapRef:
+                name: langfuse-config
           env:
             - name: OPENROUTER_API_KEY
               valueFrom:

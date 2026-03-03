@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: langfuse-config
+  namespace: agents
+data:
+  LANGFUSE_BASEURL: "https://cloud.langfuse.com/api/public/otel"
+  # Langfuse Cloud OTLP endpoint for OpenClaw diagnostics-otel plugin
+  # Auth is via Basic auth header using LANGFUSE_PUBLIC_KEY:LANGFUSE_SECRET_KEY
+  # These are stored in langfuse-secret (SealedSecret)
