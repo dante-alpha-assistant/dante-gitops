@@ -105,8 +105,7 @@ spec:
                     compaction: { mode: "safeguard" },
                     maxConcurrent: 4,
                     subagents: { maxConcurrent: 8 },
-                    heartbeat: { every: "5m" },
-                    thinking: "high"
+                    heartbeat: { every: "5m" }
                   }
                 },
                 hooks: { enabled: true, token: "research-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
