@@ -90,6 +90,27 @@ spec:
                     heartbeat: { every: "5m" }
                   }
                 },
+                diagnostics: {
+                  enabled: true,
+                  otel: {
+                    enabled: true,
+                    endpoint: "https://cloud.langfuse.com/api/public/otel",
+                    protocol: "http/protobuf",
+                    serviceName: "beta-worker",
+                    traces: true,
+                    metrics: true,
+                    logs: false,
+                    sampleRate: 1.0,
+                    flushIntervalMs: 30000,
+                    headers: {
+                      "Authorization": "Basic " + Buffer.from((e.LANGFUSE_PUBLIC_KEY || "") + ":" + (e.LANGFUSE_SECRET_KEY || "")).toString("base64")
+                    }
+                  }
+                },
+                plugins: {
+                  allow: ["diagnostics-otel"],
+                  entries: { "diagnostics-otel": { enabled: true } }
+                },
                 hooks: { enabled: true, token: "beta-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
                 tools: { sessions: { visibility: "all" } }
               };
@@ -163,6 +184,9 @@ spec:
                 fs.writeFileSync(cronPath, JSON.stringify(cronJobs, null, 2));
               }
               console.log('Beta-worker config written — headless QA, hooks only, kimi-k2.5');
+          envFrom:
+            - secretRef:
+                name: langfuse-env
           env:
             - name: OPENROUTER_API_KEY
               valueFrom:
@@ -182,6 +206,9 @@ spec:
           image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
           ports:
             - containerPort: 18789
+          envFrom:
+            - secretRef:
+                name: langfuse-env
           env:
             - name: OPENROUTER_API_KEY
               valueFrom:
