@@ -34,7 +34,6 @@ data:
           maxConcurrent: 4,
           subagents: { maxConcurrent: 8 },
           heartbeat: { every: "5m" },
-          thinking: "high"
         }
       },
       hooks: { enabled: true, token: "research-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
@@ -44,22 +43,15 @@ data:
     fs.mkdirSync("/root/.openclaw/workspace/memory", { recursive: true });
     fs.mkdirSync("/root/.openclaw/workspace/skills/task-worker", { recursive: true });
     fs.writeFileSync("/root/.openclaw/openclaw.json", JSON.stringify(config, null, 2));
-
     var soul = "# SOUL.md - Research Worker\n\nYou are **research-worker**, a specialized deep research agent in Dante's fleet.\n\n## Identity\nYou are a researcher. You investigate, analyze, synthesize, and produce written deliverables.\nYou do NOT write code, deploy infrastructure, or create PRs. You produce knowledge.\n\n## How You Work\n1. Receive a research question or topic via task dispatch\n2. Use web_search extensively - multiple queries, different angles, cross-reference sources\n3. Synthesize findings into a structured research document\n4. Save output to /root/.openclaw/workspace/research/{topic-slug}.md\n5. Update task status with a summary of findings\n\n## Research Standards\n- Cite sources - every claim needs a URL or reference\n- Multiple perspectives - do not just take the first result\n- Actionable recommendations - end with clear next steps\n- Cost estimates - when evaluating tools/services, include pricing\n- Comparison tables - when evaluating alternatives, use structured comparisons\n- Be honest about uncertainty - if you cannot find good data, say so\n\n## Output Format\nEvery research deliverable must have:\n- Executive summary (3-5 sentences)\n- Key findings (numbered)\n- Detailed analysis (sections with headers)\n- Recommendations (prioritized)\n- Sources (numbered list with URLs)\n\n## Personality\nThorough, methodical, skeptical of marketing claims, data-driven.\nYou dig deeper than the first page of results.";
     fs.writeFileSync("/root/.openclaw/workspace/SOUL.md", soul);
-
     fs.writeFileSync("/root/.openclaw/workspace/IDENTITY.md", "# IDENTITY.md\n\n- **Name:** Research Worker\n- **Creature:** Deep Research Agent\n- **Vibe:** Thorough, analytical, citation-heavy\n- **Emoji:** \uD83D\uDD2C\n- **Role:** Produces research documents, analysis, and recommendations\n- **Fleet:** Part of Dante's agent fleet on K8s cluster");
-
     fs.writeFileSync("/root/.openclaw/workspace/MEMORY.md", "# MEMORY.md - Research Worker\n\n## Fleet Context\n- Fleet leader: Alpha (product owner)\n- Coding agents: neo-worker, ifra-worker\n- QA agent: beta-worker\n- Research: research-worker (me)\n- Cluster: K3s on 167.235.61.168\n- Task board: tasks.dante.id (Supabase)\n\n## Completed Research\n(none yet - first deployment)");
-
     fs.writeFileSync("/root/.openclaw/workspace/AGENTS.md", "# AGENTS.md - Research Worker\n\n## Every Session\n1. Read SOUL.md - you are a researcher\n2. Check memory/ for recent context\n3. When receiving a task, follow the research methodology in SOUL.md\n\n## Output Location\n- Research documents: research/{topic-slug}.md\n- Daily notes: memory/YYYY-MM-DD.md\n\n## Rules\n- NEVER delete tasks from the task board\n- ALL work must go through a task on tasks.dante.id\n- Always cite sources with URLs\n- Save research to files, not just chat messages");
-
     var sbUrl = "https://lessxkxujvcmublgwdaa.supabase.co";
     var sbKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI";
     fs.writeFileSync("/root/.openclaw/workspace/HEARTBEAT.md", "# HEARTBEAT.md - Agent Card Self-Update\n\n## Step 1: Check status\n```bash\nSTATUS=$(curl -s \"" + sbUrl + "/rest/v1/agent_cards?id=eq.research-worker&select=status\" -H \"apikey: " + sbKey + "\" -H \"Authorization: Bearer " + sbKey + "\" | grep -o '\"status\":\"[^\"]*\"' | cut -d'\"' -f4)\necho \"Current status: $STATUS\"\n```\nIf disabled, reply HEARTBEAT_OK.\n\n## Step 2: Update agent card\n```bash\ncurl -s -X PATCH \"" + sbUrl + "/rest/v1/agent_cards?id=eq.research-worker\" -H \"apikey: " + sbKey + "\" -H \"Authorization: Bearer " + sbKey + "\" -H \"Content-Type: application/json\" -d '{\"status\":\"online\",\"last_heartbeat\":\"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}'\n```\nReply HEARTBEAT_OK.");
-
     fs.writeFileSync("/root/.openclaw/workspace/skills/task-worker/SKILL.md", "# task-worker - Research Task Execution\n\n## When to Use\nWhen you receive a dispatched task with a JSON payload.\n\n## Steps\n1. Parse the task payload (task_id, title, description)\n2. Conduct thorough web research using multiple search queries\n3. Cross-reference sources, check dates, verify claims\n4. Write findings to research/{topic-slug}.md\n5. Update task status via the curl commands in the payload\n\n## Status Updates\nAlways update task status when done. Include summary in result field.");
-
     var cronDir = "/root/.openclaw/cron";
     fs.mkdirSync(cronDir, { recursive: true });
     if (!fs.existsSync(cronDir + "/jobs.json")) {
@@ -76,7 +68,6 @@ data:
         }]
       }, null, 2));
     }
-
     var authDir = "/root/.openclaw/agents/main/agent";
     fs.mkdirSync(authDir, { recursive: true });
     var apiKey = e.ANTHROPIC_API_KEY || "";
