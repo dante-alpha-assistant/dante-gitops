@@ -27,6 +27,7 @@ spec:
             - |
               const fs = require('fs');
               const e = process.env;
+              const langfuseAuth = e.LANGFUSE_PUBLIC_KEY && e.LANGFUSE_SECRET_KEY ? Buffer.from(e.LANGFUSE_PUBLIC_KEY + ':' + e.LANGFUSE_SECRET_KEY).toString('base64') : '';
               const config = {
                 gateway: {
                   port: 18789,
@@ -65,7 +66,9 @@ spec:
                   }
                 },
                 hooks: { enabled: true, token: "ifra-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
-                tools: { sessions: { visibility: "all" } }
+                tools: { sessions: { visibility: "all" } },
+                plugins: { allow: ["diagnostics-otel"], entries: { "diagnostics-otel": { enabled: !!langfuseAuth } } },
+                diagnostics: langfuseAuth ? { enabled: true, otel: { enabled: true, endpoint: "https://us.cloud.langfuse.com/api/public/otel", protocol: "http/protobuf", serviceName: "openclaw-ifra-worker", headers: { Authorization: "Basic " + langfuseAuth }, traces: true, metrics: true, logs: false, sampleRate: 1.0, flushIntervalMs: 30000 } } : { enabled: false }
               };
               fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
               fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
@@ -263,6 +266,8 @@ spec:
           envFrom:
             - secretRef:
                 name: ifra-worker-env
+            - secretRef:
+                name: langfuse-env
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
@@ -274,6 +279,8 @@ spec:
           envFrom:
             - secretRef:
                 name: ifra-worker-env
+            - secretRef:
+                name: langfuse-env
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
