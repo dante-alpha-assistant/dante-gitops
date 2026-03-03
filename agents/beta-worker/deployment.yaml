@@ -166,6 +166,9 @@ spec:
                 fs.writeFileSync(cronPath, JSON.stringify(cronJobs, null, 2));
               }
               console.log('Beta-worker config written — headless QA, hooks only, kimi-k2.5');
+          envFrom:
+            - secretRef:
+                name: langfuse-env
           env:
             - name: OPENROUTER_API_KEY
               valueFrom:
@@ -185,6 +188,9 @@ spec:
           image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
           ports:
             - containerPort: 18789
+          envFrom:
+            - secretRef:
+                name: langfuse-env
           env:
             - name: OPENROUTER_API_KEY
               valueFrom:
