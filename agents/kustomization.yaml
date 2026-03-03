@@ -11,3 +11,4 @@ resources:
   - neo-worker/
   - beta-worker/
   - worker-template/
+  - research-worker/

@@ -1,0 +1,387 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: research-worker
+  namespace: agents
+  labels:
+    app: research-worker
+    role: agent
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: research-worker
+  template:
+    metadata:
+      labels:
+        app: research-worker
+        role: agent
+    spec:
+      initContainers:
+        - name: init-tools
+          image: debian:bookworm-slim
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              apt-get update -qq && apt-get install -y -qq curl ca-certificates openssh-client > /dev/null 2>&1
+              KUBE_VER=v1.31.0
+              curl -sL "https://dl.k8s.io/release/${KUBE_VER}/bin/linux/amd64/kubectl" -o /tools/kubectl
+              chmod +x /tools/kubectl
+              echo "kubectl ${KUBE_VER} installed"
+              SSH_DIR=/pvc/.ssh
+              mkdir -p "$SSH_DIR"
+              if [ ! -f "$SSH_DIR/id_ed25519" ]; then
+                ssh-keygen -t ed25519 -f "$SSH_DIR/id_ed25519" -N "" -q
+              fi
+              ssh-keyscan github.com 167.235.61.168 >> "$SSH_DIR/known_hosts" 2>/dev/null
+              sort -u "$SSH_DIR/known_hosts" -o "$SSH_DIR/known_hosts"
+              chmod 700 "$SSH_DIR"
+              chmod 600 "$SSH_DIR/id_ed25519"
+              chmod 644 "$SSH_DIR/id_ed25519.pub"
+              [ -f "$SSH_DIR/known_hosts" ] && chmod 644 "$SSH_DIR/known_hosts"
+              mkdir -p /ssh-out
+              cp "$SSH_DIR/id_ed25519" /ssh-out/id_ed25519
+              cp "$SSH_DIR/id_ed25519.pub" /ssh-out/id_ed25519.pub
+              [ -f "$SSH_DIR/known_hosts" ] && cp "$SSH_DIR/known_hosts" /ssh-out/known_hosts
+              chmod 600 /ssh-out/id_ed25519
+              chmod 644 /ssh-out/id_ed25519.pub
+              [ -f /ssh-out/known_hosts ] && chmod 644 /ssh-out/known_hosts
+              echo "Tools + SSH ready"
+          volumeMounts:
+            - name: tools-bin
+              mountPath: /tools
+            - name: data
+              mountPath: /pvc
+            - name: ssh-out
+              mountPath: /ssh-out
+        - name: init-config
+          image: node:22-bookworm-slim
+          command: ["node", "-e"]
+          envFrom:
+            - secretRef:
+                name: research-worker-env
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
+          args:
+            - |
+              const fs = require('fs');
+              const e = process.env;
+              const agentId = 'research-worker';
+              const sbUrl = 'https://lessxkxujvcmublgwdaa.supabase.co';
+              const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI';
+
+              // --- OpenClaw config ---
+              const config = {
+                gateway: {
+                  port: 18789, mode: "local", bind: "lan",
+                  auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "" },
+                  tools: { allow: ["sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron","web_search","web_fetch"] },
+                  controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
+                },
+                models: {
+                  providers: {
+                    anthropic: {
+                      baseUrl: "https://api.anthropic.com",
+                      models: [{ id: "claude-opus-4-6", name: "claude-opus-4-6", api: "anthropic-messages", reasoning: true, input: ["text","image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 }]
+                    },
+                    openrouter: {
+                      baseUrl: "https://openrouter.ai/api/v1",
+                      apiKey: e.OPENROUTER_API_KEY || "",
+                      models: [
+                        { id: "moonshotai/kimi-k2.5", name: "kimi-k2.5", api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 0.45, output: 2.25, cacheRead: 0.07, cacheWrite: 0 }, contextWindow: 262144, maxTokens: 8192 },
+                        { id: "google/gemini-2.5-flash-preview", name: "gemini-flash", api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 0.15, output: 0.60, cacheRead: 0.04, cacheWrite: 0 }, contextWindow: 1048576, maxTokens: 8192 },
+                      ]
+                    }
+                  }
+                },
+                agents: {
+                  defaults: {
+                    model: { primary: "openrouter/moonshotai/kimi-k2.5" },
+                    workspace: "/root/.openclaw/workspace",
+                    compaction: { mode: "safeguard" },
+                    maxConcurrent: 4,
+                    subagents: { maxConcurrent: 8 },
+                    heartbeat: { every: "5m" },
+                    thinking: "high"
+                  }
+                },
+                hooks: { enabled: true, token: "research-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
+                tools: { sessions: { visibility: "all" } }
+              };
+              fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
+              fs.mkdirSync('/root/.openclaw/workspace/research', { recursive: true });
+              fs.mkdirSync('/root/.openclaw/workspace/memory', { recursive: true });
+              fs.mkdirSync('/root/.openclaw/workspace/skills', { recursive: true });
+              fs.mkdirSync('/root/.openclaw/cron', { recursive: true });
+              fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
+
+              // --- SOUL.md ---
+              const soulPath = '/root/.openclaw/workspace/SOUL.md';
+              if (!fs.existsSync(soulPath)) fs.writeFileSync(soulPath, [
+                '# SOUL.md — Research Worker',
+                '',
+                'You are **research-worker**, a specialized deep research agent.',
+                '',
+                '## Identity',
+                '- **Name**: Research Worker (Iris)',
+                '- **Role**: Deep research analyst for Dante\'s agent fleet',
+                '- **Emoji**: 🔬',
+                '',
+                '## Core Purpose',
+                'You investigate complex technical questions, produce structured research documents, and deliver actionable recommendations.',
+                '',
+                '## How You Work',
+                '1. **Receive a research task** via the dispatcher (hook message with JSON payload)',
+                '2. **Plan your research** — break the question into sub-questions',
+                '3. **Research thoroughly** — use web_search, web_fetch, and your knowledge',
+                '4. **Write a structured document** — save to `research/` directory in your workspace',
+                '5. **Update task status** with a summary of findings',
+                '',
+                '## Research Standards',
+                '- Every claim must be sourced (URL or specific reference)',
+                '- Include cost estimates with actual numbers, not hand-waving',
+                '- Architecture decisions must list pros/cons/tradeoffs',
+                '- Always include an "Implementation Plan" with effort estimates',
+                '- Challenge assumptions — if the question has a flawed premise, say so',
+                '- Be opinionated — recommend ONE path, not just list options',
+                '',
+                '## Output Format',
+                'Save research documents as markdown in `research/<topic-slug>.md`',
+                'Structure:',
+                '```',
+                '# <Title>',
+                '## Executive Summary (3-5 bullet points)',
+                '## Background / Context',
+                '## Key Findings',
+                '### Finding 1',
+                '### Finding 2',
+                '## Architecture Recommendation',
+                '## Cost Analysis',
+                '## Implementation Plan',
+                '## Open Questions / Risks',
+                '## Sources',
+                '```',
+                '',
+                '## Rules',
+                '- Be thorough but concise — no padding or filler',
+                '- If a question needs real-world data (pricing, benchmarks), search for it',
+                '- If you cannot find something, say so explicitly — never fabricate data',
+                '- Update task status when done — include the file path in the result',
+                '- ALWAYS use the task-worker skill for dispatched tasks',
+              ].join('\n'));
+
+              // --- IDENTITY.md ---
+              const idPath = '/root/.openclaw/workspace/IDENTITY.md';
+              if (!fs.existsSync(idPath)) fs.writeFileSync(idPath, [
+                '# IDENTITY.md',
+                '',
+                '- **Name:** Iris (Research Worker)',
+                '- **Creature:** Deep Research Agent',
+                '- **Vibe:** Analytical, thorough, opinionated',
+                '- **Emoji:** 🔬',
+              ].join('\n'));
+
+              // --- AGENTS.md ---
+              const agentsPath = '/root/.openclaw/workspace/AGENTS.md';
+              if (!fs.existsSync(agentsPath)) fs.writeFileSync(agentsPath, [
+                '# AGENTS.md — research-worker',
+                '',
+                '## Every Session',
+                '1. Read SOUL.md',
+                '2. When receiving a task, follow the task-worker skill',
+                '3. Save research output to `research/` directory',
+                '',
+                '## Git Setup',
+                'git config --global user.email "dante-alpha-assistant@proton.me"',
+                'git config --global user.name "Research Worker"',
+              ].join('\n'));
+
+              // --- MEMORY.md ---
+              const memPath = '/root/.openclaw/workspace/MEMORY.md';
+              if (!fs.existsSync(memPath)) fs.writeFileSync(memPath, [
+                '# MEMORY.md — Research Worker',
+                '',
+                '## Fleet Context',
+                '- Part of Dante\'s agent fleet on K8s cluster (167.235.61.168)',
+                '- Managed by Alpha (product owner) via task dispatcher',
+                '- Tasks come from Supabase `agent_tasks` table',
+                '- Research output saved to workspace `research/` directory',
+                '',
+                '## Repos',
+                '- queue-dashboard: tasks.dante.id frontend + API',
+                '- task-dispatcher: scheduler + dispatch logic',
+                '- dante-gitops: K8s manifests + ArgoCD configs',
+                '- agent-skills: shared skills across fleet',
+                '',
+                '## Infrastructure',
+                '- K3s cluster on Hetzner (167.235.61.168)',
+                '- ArgoCD for gitops, sealed-secrets for secrets',
+                '- Supabase for task DB + realtime',
+                '- GHCR for container images',
+              ].join('\n'));
+
+              // --- HEARTBEAT.md ---
+              const hbPath = '/root/.openclaw/workspace/HEARTBEAT.md';
+              if (!fs.existsSync(hbPath) || fs.readFileSync(hbPath, 'utf8').includes('Keep this file empty')) {
+                fs.writeFileSync(hbPath, [
+                  '# HEARTBEAT.md — Agent Card Self-Update',
+                  '',
+                  'Run these steps IN ORDER every heartbeat.',
+                  '',
+                  '## Step 1: Check current status',
+                  '```bash',
+                  `STATUS=$(curl -s "${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}&select=status" \\`,
+                  `  -H "apikey: ${sbKey}" \\`,
+                  `  -H "Authorization: Bearer ${sbKey}" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)`,
+                  'echo "Current status: $STATUS"',
+                  '```',
+                  'If status is "disabled", reply HEARTBEAT_OK.',
+                  '',
+                  '## Step 2: Update agent card',
+                  '```bash',
+                  `curl -s -X PATCH "${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}" \\`,
+                  `  -H "apikey: ${sbKey}" \\`,
+                  `  -H "Authorization: Bearer ${sbKey}" \\`,
+                  '  -H "Content-Type: application/json" \\',
+                  `  -d '{"status":"online","last_heartbeat":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}'`,
+                  '```',
+                  'Reply HEARTBEAT_OK.',
+                ].join('\n'));
+              }
+
+              // --- Heartbeat cron ---
+              const cronPath = '/root/.openclaw/cron/jobs.json';
+              if (!fs.existsSync(cronPath)) {
+                fs.writeFileSync(cronPath, JSON.stringify({
+                  version: 1,
+                  jobs: [{
+                    id: 'heartbeat-agent-card', name: 'heartbeat-agent-card', enabled: true,
+                    createdAtMs: Date.now(), updatedAtMs: Date.now(),
+                    schedule: { kind: 'every', everyMs: 300000, anchorMs: Date.now() },
+                    sessionTarget: 'isolated', wakeMode: 'now',
+                    payload: { kind: 'agentTurn', message: 'Run the heartbeat: update your agent card. Read HEARTBEAT.MD and follow it.', timeoutSeconds: 30 },
+                    delivery: { mode: 'none', channel: 'last' },
+                    state: { nextRunAtMs: Date.now() + 300000 }
+                  }]
+                }, null, 2));
+              }
+
+              // --- task-worker skill ---
+              const skillDir = '/root/.openclaw/workspace/skills/task-worker';
+              fs.mkdirSync(skillDir, { recursive: true });
+              fs.writeFileSync(skillDir + '/SKILL.md', [
+                '# task-worker — Dispatched Task Execution Skill',
+                '',
+                '## When to Use',
+                'This skill applies to EVERY message from "Task Dispatcher" that contains a JSON task payload.',
+                '',
+                '## Research Workflow',
+                '1. Parse the task JSON — extract task_id, title, description',
+                '2. Plan research approach — break into sub-questions',
+                '3. Use web_search and web_fetch to gather data',
+                '4. Write structured research document to `research/<slug>.md`',
+                '5. Update task status with summary + file path',
+                '',
+                '## Status Updates',
+                'The dispatch message includes curl commands for status updates. ALWAYS run them when done.',
+                'Include the research file path and key findings in the `result.summary` field.',
+              ].join('\n'));
+
+              // --- Auth profiles ---
+              const authDir = '/root/.openclaw/agents/main/agent';
+              fs.mkdirSync(authDir, { recursive: true });
+              const apiKey = e.ANTHROPIC_API_KEY || '';
+              if (apiKey) {
+                let existing = {};
+                try { existing = JSON.parse(fs.readFileSync(authDir + '/auth-profiles.json', 'utf8')); } catch(_) {}
+                existing.version = 1;
+                existing.profiles = existing.profiles || {};
+                existing.profiles['anthropic:default'] = { type: 'token', provider: 'anthropic', token: apiKey };
+                existing.lastGood = existing.lastGood || {};
+                existing.lastGood.anthropic = 'anthropic:default';
+                fs.writeFileSync(authDir + '/auth-profiles.json', JSON.stringify(existing, null, 2));
+              }
+              console.log('research-worker init-config complete');
+      containers:
+        - name: openclaw
+          image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+          ports:
+            - containerPort: 18789
+          envFrom:
+            - secretRef:
+                name: research-worker-env
+          env:
+            - name: PATH
+              value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: research-worker-env
+                  key: ANTHROPIC_API_KEY
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
+            - name: tools-bin
+              mountPath: /tools
+              readOnly: true
+            - name: ssh-out
+              mountPath: /root/.ssh
+              readOnly: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            tcpSocket:
+              port: 18789
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 18789
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: research-worker-data
+        - name: tools-bin
+          emptyDir: {}
+        - name: ssh-out
+          emptyDir: {}
+      imagePullSecrets:
+        - name: ghcr-secret
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: research-worker-data
+  namespace: agents
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: research-worker
+  namespace: agents
+spec:
+  selector:
+    app: research-worker
+  ports:
+    - port: 18789
+      targetPort: 18789
