@@ -5,3 +5,4 @@ resources:
   - redis/
   - queue-dashboard/
   - task-dispatcher/
+  - node-sysctl-daemonset.yaml
