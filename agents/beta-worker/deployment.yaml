@@ -7,9 +7,12 @@ metadata:
     app: beta-worker
     role: agent
 spec:
-  replicas: 1
+  replicas: 2
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: beta-worker
@@ -30,11 +33,9 @@ spec:
               KUBE_VER=v1.31.0
               curl -sL "https://dl.k8s.io/release/${KUBE_VER}/bin/linux/amd64/kubectl" -o /tools/kubectl
               chmod +x /tools/kubectl
-              SSH_DIR=/pvc/.ssh
+              SSH_DIR=/data/.ssh
               mkdir -p "$SSH_DIR"
-              if [ ! -f "$SSH_DIR/id_ed25519" ]; then
-                ssh-keygen -t ed25519 -f "$SSH_DIR/id_ed25519" -N "" -q
-              fi
+              ssh-keygen -t ed25519 -f "$SSH_DIR/id_ed25519" -N "" -q
               ssh-keyscan github.com 167.235.61.168 >> "$SSH_DIR/known_hosts" 2>/dev/null
               sort -u "$SSH_DIR/known_hosts" -o "$SSH_DIR/known_hosts"
               chmod 700 "$SSH_DIR" && chmod 600 "$SSH_DIR/id_ed25519" && chmod 644 "$SSH_DIR/id_ed25519.pub"
@@ -50,7 +51,7 @@ spec:
             - name: tools-bin
               mountPath: /tools
             - name: data
-              mountPath: /pvc
+              mountPath: /data
             - name: ssh-out
               mountPath: /ssh-out
         - name: init-config
@@ -66,7 +67,7 @@ spec:
                   mode: "local",
                   bind: "lan",
                   auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "beta-worker-gw-tok-2026" },
-                  tools: { allow: ["sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] },
+                  tools: { allow: ["Read","Write","Edit","exec","web_fetch","sessions_spawn","sessions_send","sessions_list","sessions_history","session_status"] },
                   controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
                 },
                 models: {
@@ -75,7 +76,7 @@ spec:
                       baseUrl: "https://openrouter.ai/api/v1",
                       apiKey: e.OPENROUTER_API_KEY || "",
                       models: [
-                        { id: "moonshotai/kimi-k2.5", name: "kimi-k2.5", api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 0.45, output: 2.25, cacheRead: 0.07, cacheWrite: 0 }, contextWindow: 262144, maxTokens: 4096 }
+                        { id: "moonshotai/kimi-k2.5", name: "kimi-k2.5", api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 0.45, output: 2.25 }, contextWindow: 262144, maxTokens: 16384 }
                       ]
                     }
                   }
@@ -85,84 +86,23 @@ spec:
                     model: { primary: "openrouter/moonshotai/kimi-k2.5" },
                     workspace: "/root/.openclaw/workspace",
                     compaction: { mode: "safeguard" },
-                    maxConcurrent: 4,
-                    subagents: { maxConcurrent: 4 },
-                    heartbeat: { every: "5m" }
+                    maxConcurrent: 2
                   }
                 },
-                hooks: { enabled: true, token: "beta-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
+                hooks: { enabled: true, token: e.HOOKS_TOKEN || "beta-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
                 tools: { sessions: { visibility: "all" } }
               };
               fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
               fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
               fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
-              // HEARTBEAT.md
-              const sbUrl = 'https://lessxkxujvcmublgwdaa.supabase.co';
-              const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI';
-              const heartbeat = [
-                '# HEARTBEAT.MD — Agent Card Self-Update + Model Health Check',
-                '',
-                'Run these steps IN ORDER every heartbeat. Do NOT modify any commands.',
-                '',
-                '## Step 1: Check current status',
-                '',
-                '```bash',
-                `STATUS=$(curl -s "${sbUrl}/rest/v1/agent_cards?id=eq.beta-worker&select=status" \\`,
-                `  -H "apikey: ${sbKey}" \\`,
-                `  -H "Authorization: Bearer ${sbKey}" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)`,
-                'echo "Current status: $STATUS"',
-                '```',
-                '',
-                'If status is "disabled", skip everything and reply HEARTBEAT_OK.',
-                '',
-                '## Step 2: Model health verified',
-                '',
-                'If you are reading and executing this, your model API is healthy.',
-                '(A broken model would cause this heartbeat session to fail before reaching here.)',
-                '',
-                '## Step 3: Update agent card — online + model_health ok',
-                '',
-                '```bash',
-                `curl -s -X PATCH "${sbUrl}/rest/v1/agent_cards?id=eq.beta-worker" \\`,
-                `  -H "apikey: ${sbKey}" \\`,
-                `  -H "Authorization: Bearer ${sbKey}" \\`,
-                '  -H "Content-Type: application/json" \\',
-                `  -d '{"status":"online","last_heartbeat":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","metadata":{"model_health":"ok","model_health_at":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}}'`,
-                '```',
-                '',
-                'If the curl succeeds, reply HEARTBEAT_OK.',
-              ].join('\\n');
-              const hbPath = '/root/.openclaw/workspace/HEARTBEAT.md';
-              if (!fs.existsSync(hbPath) || fs.readFileSync(hbPath, 'utf8').includes('Keep this file empty')) {
-                fs.writeFileSync(hbPath, heartbeat);
+              // Minimal workspace files
+              fs.writeFileSync('/root/.openclaw/workspace/AGENTS.md', '# QA Worker\nYou are a QA testing agent for the Dante fleet.\nReview tasks, verify work quality, update status.\nDo NOT create memory files.\n');
+              fs.writeFileSync('/root/.openclaw/workspace/SOUL.md', '# SOUL.md - Beta Worker\n\nYou are **beta-worker** — a headless QA testing agent.\n\n## Role\n- Review completed tasks for quality\n- Check code, test coverage, edge cases\n- Update task status to completed or failed\n- Provide specific, actionable feedback\n\n## Rules\n- Be thorough but fast (20 min per task)\n- Never delete tasks\n- Use curl for Supabase API calls\n');
+              // Remove default files that bloat system prompt
+              for (const f of ['BOOTSTRAP.md','IDENTITY.md','TOOLS.md','USER.md','HEARTBEAT.md','MEMORY.md']) {
+                try { fs.unlinkSync('/root/.openclaw/workspace/' + f); } catch(e) {}
               }
-              // SOUL.md
-              const soul = '# SOUL.md - Beta Worker\\n\\nYou are **beta-worker** ⚡ — a headless QA testing agent.\\n\\n## Role\\n- Dedicated E2E tester for the Dante agent fleet\\n- Receive tasks via hooks, run QA, report results\\n- No Discord, no interactive sessions — pure automated QA\\n\\n## How You Work\\n1. Receive a task that has been marked as done by another agent\\n2. Review the work: check code quality, test coverage, edge cases\\n3. If QA passes: update task status to completed with your assessment\\n4. If QA fails: update task status to failed with specific issues found\\n\\n## Rules\\n- Be thorough but fast — you have 20 minutes per QA task\\n- Always provide specific, actionable feedback\\n- Never delete tasks from the board\\n- Use the task-manager skill for all status updates';
-              fs.writeFileSync('/root/.openclaw/workspace/SOUL.md', soul);
-              // Cron
-              const cronDir = '/root/.openclaw/cron';
-              fs.mkdirSync(cronDir, { recursive: true });
-              const cronPath = cronDir + '/jobs.json';
-              if (!fs.existsSync(cronPath)) {
-                const cronJobs = {
-                  version: 1,
-                  jobs: [{
-                    id: 'heartbeat-agent-card',
-                    name: 'heartbeat-agent-card',
-                    enabled: true,
-                    createdAtMs: Date.now(),
-                    updatedAtMs: Date.now(),
-                    schedule: { kind: 'every', everyMs: 300000, anchorMs: Date.now() },
-                    sessionTarget: 'isolated',
-                    wakeMode: 'now',
-                    payload: { kind: 'agentTurn', message: 'Run the heartbeat: update your agent card. Read HEARTBEAT.MD and follow it.', timeoutSeconds: 30 },
-                    delivery: { mode: 'none', channel: 'last' },
-                    state: { nextRunAtMs: Date.now() + 300000 }
-                  }]
-                };
-                fs.writeFileSync(cronPath, JSON.stringify(cronJobs, null, 2));
-              }
-              console.log('Beta-worker config written — headless QA, hooks only, kimi-k2.5');
+              console.log('Beta-worker config written — QA agent, kimi-k2.5, maxTokens 16384');
           env:
             - name: OPENROUTER_API_KEY
               valueFrom:
@@ -174,12 +114,18 @@ spec:
                 secretKeyRef:
                   name: beta-worker-env
                   key: OPENCLAW_GATEWAY_TOKEN
+            - name: HOOKS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: beta-worker-env
+                  key: HOOKS_TOKEN
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
       containers:
         - name: openclaw
           image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 18789
           env:
@@ -198,8 +144,15 @@ spec:
                 secretKeyRef:
                   name: beta-worker-env
                   key: GH_TOKEN
+            - name: HOOKS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: beta-worker-env
+                  key: HOOKS_TOKEN
             - name: PATH
               value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=1536"
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
@@ -212,27 +165,26 @@ spec:
           resources:
             requests:
               cpu: 250m
-              memory: 256Mi
+              memory: 512Mi
             limits:
               cpu: 1000m
               memory: 2Gi
-          livenessProbe:
-            tcpSocket:
-              port: 18789
-            initialDelaySeconds: 120
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 5
           readinessProbe:
             tcpSocket:
               port: 18789
-            initialDelaySeconds: 60
-            periodSeconds: 5
+            initialDelaySeconds: 90
+            periodSeconds: 10
             timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 18789
+            initialDelaySeconds: 180
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
       volumes:
         - name: data
-          persistentVolumeClaim:
-            claimName: beta-worker-data
+          emptyDir: {}
         - name: tools-bin
           emptyDir: {}
         - name: ssh-out
