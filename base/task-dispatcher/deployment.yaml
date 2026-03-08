@@ -54,6 +54,14 @@ spec:
             - name: IFRA_MAX_CONCURRENT
               value: "2"
             - name: IFRA_GATEWAY_TOKEN
+            - name: IFRA_WORKER_HOOKS_TOKEN
+              value: "ifra-hooks-tok-2026"
+            - name: IFRA_WORKER_GATEWAY_TOKEN
+            - name: RESEARCH_WORKER_HOOKS_TOKEN
+              value: "research-worker-hooks-tok-2026"
+            - name: RESEARCH_WORKER_GATEWAY_TOKEN
+              value: "research-worker-gw-tok-2026"
+              value: "ifra-worker-gw-tok-2026"
               value: "ifra-gw-tok-2026"
             - name: ARGOCD_URL
               value: "http://argocd-server.argocd.svc.cluster.local"
