@@ -65,7 +65,28 @@ spec:
                     subagents: { maxConcurrent: 4 }
                   }
                 },
-                tools: { sessions: { visibility: "all" } }
+                tools: { sessions: { visibility: "all" } },
+                plugins: {
+                  allow: ["diagnostics-otel"],
+                  entries: { "diagnostics-otel": { enabled: true } }
+                },
+                diagnostics: {
+                  enabled: true,
+                  otel: {
+                    enabled: true,
+                    endpoint: e.LANGFUSE_BASEURL ? (e.LANGFUSE_BASEURL + "/api/public/otel") : "https://cloud.langfuse.com/api/public/otel",
+                    protocol: "http/protobuf",
+                    serviceName: "eliseo",
+                    headers: {
+                      Authorization: "Basic " + Buffer.from((e.LANGFUSE_PUBLIC_KEY || "") + ":" + (e.LANGFUSE_SECRET_KEY || "")).toString("base64")
+                    },
+                    traces: true,
+                    metrics: true,
+                    logs: false,
+                    sampleRate: 1.0,
+                    flushIntervalMs: 30000
+                  }
+                }
               };
               fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
               fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
@@ -74,6 +95,8 @@ spec:
           envFrom:
             - secretRef:
                 name: eliseo-env
+            - secretRef:
+                name: langfuse-env
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
@@ -85,6 +108,8 @@ spec:
           envFrom:
             - secretRef:
                 name: eliseo-env
+            - secretRef:
+                name: langfuse-env
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
