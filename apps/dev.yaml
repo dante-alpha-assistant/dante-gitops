@@ -4,8 +4,6 @@ metadata:
   name: dev
   namespace: argocd
   annotations:
-    # Image Updater: use 'latest' strategy (no digest pinning)
-    # This triggers rollout restart when :latest tag changes, without kustomize overrides
     argocd-image-updater.argoproj.io/image-list: "qd=ghcr.io/dante-alpha-assistant/queue-dashboard, td=ghcr.io/dante-alpha-assistant/task-dispatcher"
     argocd-image-updater.argoproj.io/qd.update-strategy: latest
     argocd-image-updater.argoproj.io/td.update-strategy: latest
@@ -23,3 +21,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - Replace=true
