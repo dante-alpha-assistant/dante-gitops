@@ -7,9 +7,9 @@ metadata:
     app: ifra-worker
     role: worker
 spec:
-  replicas: 1
+  replicas: 2
   strategy:
-    type: Recreate
+    type: RollingUpdate
   selector:
     matchLabels:
       app: ifra-worker
