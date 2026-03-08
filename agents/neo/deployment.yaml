@@ -133,6 +133,27 @@ spec:
                     subagents: { maxConcurrent: 8 }
                   }
                 },
+                diagnostics: {
+                  enabled: true,
+                  otel: {
+                    enabled: true,
+                    endpoint: "https://cloud.langfuse.com/api/public/otel",
+                    protocol: "http/protobuf",
+                    serviceName: "neo",
+                    traces: true,
+                    metrics: true,
+                    logs: false,
+                    sampleRate: 1.0,
+                    flushIntervalMs: 30000,
+                    headers: {
+                      "Authorization": "Basic " + Buffer.from((e.LANGFUSE_PUBLIC_KEY || "") + ":" + (e.LANGFUSE_SECRET_KEY || "")).toString("base64")
+                    }
+                  }
+                },
+                plugins: {
+                  allow: ["diagnostics-otel"],
+                  entries: { "diagnostics-otel": { enabled: true } }
+                },
                 hooks: { enabled: true, token: "neo-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
                 tools: { sessions: { visibility: "all" } }
               };
@@ -160,6 +181,8 @@ spec:
           envFrom:
             - secretRef:
                 name: neo-env
+            - secretRef:
+                name: langfuse-env
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
@@ -171,6 +194,8 @@ spec:
           envFrom:
             - secretRef:
                 name: neo-env
+            - secretRef:
+                name: langfuse-env
           env:
             - name: PATH
               value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
