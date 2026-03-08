@@ -3,7 +3,6 @@ kind: Deployment
 metadata:
   name: queue-dashboard
   annotations:
-    argocd.argoproj.io/sync-options: Replace=true
 spec:
   replicas: 1
   selector:
