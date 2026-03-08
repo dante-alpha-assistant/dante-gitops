@@ -2,7 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: queue-dashboard
-  
+  annotations:
+    argocd.argoproj.io/sync-options: Replace=true
 spec:
   replicas: 1
   selector:
@@ -23,8 +24,6 @@ spec:
             - secretRef:
                 name: queue-dashboard-env
           env:
-            - name: SUPABASE_URL
-              value: "https://lessxkxujvcmublgwdaa.supabase.co"
             - name: PORT
               value: "3000"
             - name: NODE_ENV
