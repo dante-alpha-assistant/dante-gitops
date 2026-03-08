@@ -61,6 +61,25 @@ spec:
                     subagents: { maxConcurrent: 4 }
                   }
                 },
+                plugins: {
+                  allow: ["diagnostics-otel"],
+                  entries: { "diagnostics-otel": { enabled: true } }
+                },
+                diagnostics: {
+                  enabled: true,
+                  otel: {
+                    enabled: true,
+                    endpoint: (e.LANGFUSE_BASEURL || "https://cloud.langfuse.com") + "/api/public/otel",
+                    protocol: "http/protobuf",
+                    serviceName: agentName,
+                    traces: true,
+                    metrics: true,
+                    logs: false,
+                    sampleRate: 1.0,
+                    flushIntervalMs: 30000,
+                    headers: { "Authorization": "Basic " + (e.LANGFUSE_OTEL_AUTH || "") }
+                  }
+                },
                 hooks: { enabled: true, token: e.HOOKS_TOKEN || `${agentName}-hooks-tok-2026`, allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
                 tools: { sessions: { visibility: "all" } }
               };
@@ -79,6 +98,8 @@ spec:
           envFrom:
             - secretRef:
                 name: worker-template-env
+            - secretRef:
+                name: langfuse-credentials
           env:
             - name: WORKER_NAME
               value: "worker-template"
@@ -99,6 +120,8 @@ spec:
           envFrom:
             - secretRef:
                 name: worker-template-env
+            - secretRef:
+                name: langfuse-credentials
           env:
             - name: WORKER_NAME
               value: "worker-template"
