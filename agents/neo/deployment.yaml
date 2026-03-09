@@ -87,7 +87,8 @@ spec:
                   bind: "lan",
                   auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "" },
                   tools: { allow: ["sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] },
-                  controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
+                  controlUi: { dangerouslyAllowHostHeaderOriginFallback: true },
+                  http: { endpoints: { chatCompletions: { enabled: true } } }
                 },
                 channels: {
                   discord: {
