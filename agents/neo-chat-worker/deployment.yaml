@@ -1,0 +1,254 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neo-chat-worker
+  namespace: agents
+  labels:
+    app: neo-chat-worker
+    role: agent
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: neo-chat-worker
+  template:
+    metadata:
+      labels:
+        app: neo-chat-worker
+        role: agent
+    spec:
+      initContainers:
+        - name: init-tools
+          image: debian:bookworm-slim
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              apt-get update -qq && apt-get install -y -qq curl ca-certificates openssh-client > /dev/null 2>&1
+              KUBE_VER=v1.31.0
+              curl -sL "https://dl.k8s.io/release/${KUBE_VER}/bin/linux/amd64/kubectl" -o /tools/kubectl
+              chmod +x /tools/kubectl
+              SSH_DIR=/data/.ssh
+              mkdir -p "$SSH_DIR"
+              ssh-keygen -t ed25519 -f "$SSH_DIR/id_ed25519" -N "" -q
+              ssh-keyscan github.com 167.235.61.168 >> "$SSH_DIR/known_hosts" 2>/dev/null
+              sort -u "$SSH_DIR/known_hosts" -o "$SSH_DIR/known_hosts"
+              chmod 700 "$SSH_DIR" && chmod 600 "$SSH_DIR/id_ed25519" && chmod 644 "$SSH_DIR/id_ed25519.pub"
+              [ -f "$SSH_DIR/known_hosts" ] && chmod 644 "$SSH_DIR/known_hosts"
+              mkdir -p /ssh-out
+              cp "$SSH_DIR/id_ed25519" /ssh-out/id_ed25519
+              cp "$SSH_DIR/id_ed25519.pub" /ssh-out/id_ed25519.pub
+              [ -f "$SSH_DIR/known_hosts" ] && cp "$SSH_DIR/known_hosts" /ssh-out/known_hosts
+              chmod 600 /ssh-out/id_ed25519 && chmod 644 /ssh-out/id_ed25519.pub
+              [ -f /ssh-out/known_hosts ] && chmod 644 /ssh-out/known_hosts
+              echo "Tools + SSH ready"
+          volumeMounts:
+            - name: tools-bin
+              mountPath: /tools
+            - name: data
+              mountPath: /data
+            - name: ssh-out
+              mountPath: /ssh-out
+        - name: init-config
+          image: node:22-bookworm-slim
+          command: ["node", "-e"]
+          args:
+            - |
+              const fs = require('fs');
+              const e = process.env;
+              const config = {
+                gateway: {
+                  port: 18789,
+                  mode: "local",
+                  bind: "lan",
+                  auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "neo-chat-worker-gw-tok-2026" },
+                  http: { endpoints: { chatCompletions: { enabled: true } } },
+                  tools: { allow: ["Read","Write","Edit","exec","web_fetch","web_search","sessions_spawn","sessions_send","sessions_list","sessions_history","session_status"] },
+                  controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
+                },
+                models: {
+                  providers: {
+                    openrouter: {
+                      baseUrl: "https://openrouter.ai/api/v1",
+                      apiKey: e.OPENROUTER_API_KEY || "",
+                      models: [
+                        { id: "moonshotai/kimi-k2.5", name: "kimi-k2.5", api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 0.45, output: 2.25, cacheRead: 0.07, cacheWrite: 0 }, contextWindow: 262144, maxTokens: 8192 }
+                      ]
+                    },
+                    anthropic: {
+                      baseUrl: "https://api.anthropic.com",
+                      models: [{ id: "claude-opus-4-6", name: "claude-opus-4-6", api: "anthropic-messages", reasoning: true, input: ["text","image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 }]
+                    }
+                  }
+                },
+                agents: {
+                  defaults: {
+                    model: { primary: "openrouter/moonshotai/kimi-k2.5" },
+                    workspace: "/root/.openclaw/workspace",
+                    compaction: { mode: "safeguard" },
+                    maxConcurrent: 4,
+                    subagents: { maxConcurrent: 4 }
+                  }
+                },
+                hooks: { enabled: true, token: e.HOOKS_TOKEN || "neo-chat-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
+                tools: { sessions: { visibility: "all" } }
+              };
+              fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
+              fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
+              fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
+              // SOUL.md — Chat UI interface
+              fs.writeFileSync('/root/.openclaw/workspace/SOUL.md', [
+                '# SOUL.md - neo-chat-worker',
+                '',
+                'You are **neo-chat-worker**, the Chat UI interface for the tasks.dante.id dashboard.',
+                '',
+                '## Role',
+                '- Handle user messages from the "Chat with Neo" widget on the dashboard',
+                '- Help users create tasks, answer questions about the task board, and provide general assistance',
+                '- You are conversational, helpful, and concise',
+                '',
+                '## Capabilities',
+                '- Create tasks on the board via the dashboard API:',
+                '  ```',
+                '  curl -s -X POST "https://tasks.dante.id/api/tasks" \\',
+                '    -H "Content-Type: application/json" \\',
+                '    -d \'{"title":"...","description":"...","type":"coding|ops|research|design","priority":"low|normal|high|urgent"}\'',
+                '  ```',
+                '- Query existing tasks via Supabase API',
+                '- Answer questions about the Dante agent fleet and infrastructure',
+                '',
+                '## Rules',
+                '- Be conversational and helpful — users are team members or Dante himself',
+                '- If a request is vague, ask clarifying questions before creating a task',
+                '- Never delete tasks — tasks are immutable history',
+                '- Priority values: low, normal, high, urgent (NOT medium)',
+                '- You are headless — no Discord, no external messaging. Chat UI only.',
+              ].join('\n'));
+              // AGENTS.md
+              fs.writeFileSync('/root/.openclaw/workspace/AGENTS.md', [
+                '# AGENTS.md - neo-chat-worker',
+                '',
+                '## Identity',
+                'You are neo-chat-worker, the Chat UI agent for tasks.dante.id.',
+                'You handle chat widget interactions only.',
+                '',
+                '## Git Setup',
+                'git config --global user.email "dante-neo-assistant@proton.me"',
+                'git config --global user.name "Neo (Chat)"',
+              ].join('\n'));
+              // Auth profiles
+              const authDir = '/root/.openclaw/agents/main/agent';
+              fs.mkdirSync(authDir, { recursive: true });
+              const apiKey = e.ANTHROPIC_API_KEY || '';
+              if (apiKey) {
+                const auth = { version: 1, profiles: { 'anthropic:default': { type: 'token', provider: 'anthropic', token: apiKey } }, lastGood: { anthropic: 'anthropic:default' } };
+                fs.writeFileSync(authDir + '/auth-profiles.json', JSON.stringify(auth, null, 2));
+              }
+              // Remove default files that bloat system prompt
+              for (const f of ['BOOTSTRAP.md','IDENTITY.md','TOOLS.md','USER.md','HEARTBEAT.md','MEMORY.md']) {
+                try { fs.unlinkSync('/root/.openclaw/workspace/' + f); } catch(e) {}
+              }
+              console.log('neo-chat-worker config written — Chat UI agent, kimi-k2.5');
+          env:
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: neo-chat-worker-env
+                  key: OPENROUTER_API_KEY
+            - name: OPENCLAW_GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: neo-chat-worker-env
+                  key: OPENCLAW_GATEWAY_TOKEN
+            - name: HOOKS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: neo-chat-worker-env
+                  key: HOOKS_TOKEN
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: neo-chat-worker-env
+                  key: ANTHROPIC_API_KEY
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
+      containers:
+        - name: openclaw
+          image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 18789
+          env:
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: neo-chat-worker-env
+                  key: OPENROUTER_API_KEY
+            - name: OPENCLAW_GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: neo-chat-worker-env
+                  key: OPENCLAW_GATEWAY_TOKEN
+            - name: GH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: neo-chat-worker-env
+                  key: GH_TOKEN
+            - name: HOOKS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: neo-chat-worker-env
+                  key: HOOKS_TOKEN
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: neo-chat-worker-env
+                  key: ANTHROPIC_API_KEY
+            - name: PATH
+              value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=1536"
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
+            - name: tools-bin
+              mountPath: /tools
+              readOnly: true
+            - name: ssh-out
+              mountPath: /root/.ssh
+              readOnly: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          readinessProbe:
+            tcpSocket:
+              port: 18789
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 18789
+            initialDelaySeconds: 180
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: tools-bin
+          emptyDir: {}
+        - name: ssh-out
+          emptyDir: {}
+      imagePullSecrets:
+        - name: ghcr-secret
