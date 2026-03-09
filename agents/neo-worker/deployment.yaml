@@ -70,6 +70,7 @@ spec:
                   mode: "local",
                   bind: "lan",
                   auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "" },
+                  http: { endpoints: { chatCompletions: { enabled: true } } },
                   tools: { allow: ["sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] },
                   controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
                 },
