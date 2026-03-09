@@ -27,6 +27,10 @@ spec:
               value: "3000"
             - name: NODE_ENV
               value: "production"
+            - name: SUPABASE_MGMT_TOKEN
+              value: "sbp_1bba539cc0f681dba9fd333d4dc1fbdb3b9db972"
+            - name: SUPABASE_PROJECT_ID
+              value: "lessxkxujvcmublgwdaa"
           resources:
             requests:
               cpu: 100m
