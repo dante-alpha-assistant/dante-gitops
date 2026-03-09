@@ -67,6 +67,11 @@ spec:
               value: ""
             - name: LANGFUSE_SECRET_KEY
               value: ""
+            - name: GH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: task-dispatcher-env
+                  key: GH_TOKEN
             - name: LANGFUSE_BASE_URL
               value: "https://cloud.langfuse.com"
             - name: ARGOCD_URL
