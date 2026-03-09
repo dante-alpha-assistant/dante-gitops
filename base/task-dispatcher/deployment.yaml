@@ -63,6 +63,12 @@ spec:
               value: "research-worker-hooks-tok-2026"
             - name: RESEARCH_WORKER_GATEWAY_TOKEN
               value: "research-worker-gw-tok-2026"
+            - name: LANGFUSE_PUBLIC_KEY
+              value: ""
+            - name: LANGFUSE_SECRET_KEY
+              value: ""
+            - name: LANGFUSE_BASE_URL
+              value: "https://cloud.langfuse.com"
             - name: ARGOCD_URL
               value: "http://argocd-server.argocd.svc.cluster.local"
             - name: ARGOCD_USERNAME
