@@ -36,11 +36,6 @@ spec:
                 secretKeyRef:
                   name: queue-dashboard-env
                   key: GH_TOKEN
-            - name: OPENROUTER_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: queue-dashboard-env
-                  key: OPENROUTER_API_KEY
           resources:
             requests:
               cpu: 100m
