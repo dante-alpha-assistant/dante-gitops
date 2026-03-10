@@ -31,6 +31,11 @@ spec:
               value: "sbp_1bba539cc0f681dba9fd333d4dc1fbdb3b9db972"
             - name: SUPABASE_PROJECT_ID
               value: "lessxkxujvcmublgwdaa"
+            - name: GH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: queue-dashboard-env
+                  key: GH_TOKEN
           resources:
             requests:
               cpu: 100m
