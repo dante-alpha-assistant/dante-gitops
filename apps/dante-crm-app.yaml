@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dante-crm
+  namespace: argocd
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: "crm=ghcr.io/dante-alpha-assistant/dante-crm:latest"
+    argocd-image-updater.argoproj.io/crm.update-strategy: digest
+    argocd-image-updater.argoproj.io/write-back-method: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dante-alpha-assistant/dante-gitops.git
+    targetRevision: main
+    path: apps/dante-crm
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dante
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
