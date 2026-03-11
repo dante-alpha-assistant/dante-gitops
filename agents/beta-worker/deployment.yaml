@@ -149,6 +149,16 @@ spec:
                 secretKeyRef:
                   name: beta-worker-env
                   key: HOOKS_TOKEN
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: beta-worker-env
+                  key: SUPABASE_SERVICE_ROLE_KEY
+            - name: SUPABASE_MGMT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: beta-worker-env
+                  key: SUPABASE_MGMT_TOKEN
             - name: PATH
               value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
             - name: NODE_OPTIONS
