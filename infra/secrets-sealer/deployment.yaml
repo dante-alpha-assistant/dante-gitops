@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secrets-sealer
+  namespace: infra
+  labels:
+    app: secrets-sealer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: secrets-sealer
+  template:
+    metadata:
+      labels:
+        app: secrets-sealer
+    spec:
+      serviceAccountName: secrets-sealer
+      containers:
+        - name: secrets-sealer
+          image: ghcr.io/dante-alpha-assistant/secrets-sealer:latest
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: PORT
+              value: "3000"
+            - name: SEALER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: secrets-sealer-env
+                  key: SEALER_TOKEN
+            - name: GH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: secrets-sealer-env
+                  key: GH_TOKEN
+            - name: GITOPS_REPO
+              value: dante-alpha-assistant/dante-gitops
+            - name: GITOPS_BRANCH
+              value: main
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: secrets-sealer
+  namespace: infra
+  labels:
+    app: secrets-sealer
+---
+# ClusterRole to allow kubeseal cert fetch
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: secrets-sealer-cert-reader
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get"]
+    resourceNames: ["sealed-secrets-controller"]
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    verbs: ["get", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: secrets-sealer-cert-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: secrets-sealer-cert-reader
+subjects:
+  - kind: ServiceAccount
+    name: secrets-sealer
+    namespace: infra
