@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: secrets-sealer
+  namespace: infra
+  labels:
+    app: secrets-sealer
+spec:
+  # ClusterIP only — NOT exposed externally
+  type: ClusterIP
+  selector:
+    app: secrets-sealer
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
