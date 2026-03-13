@@ -151,7 +151,10 @@ spec:
                 try { existing = JSON.parse(fs.readFileSync(authPath, 'utf8')); } catch(_) {}
                 existing.version = 1;
                 existing.profiles = existing.profiles || {};
-                existing.profiles['anthropic:default'] = { type: 'token', provider: 'anthropic', token: apiKey };
+                const isOAuth = apiKey.startsWith('sk-ant-oat01-');
+                existing.profiles['anthropic:default'] = isOAuth
+                  ? { type: 'oauth', provider: 'anthropic', access: apiKey }
+                  : { type: 'api_key', provider: 'anthropic', key: apiKey };
                 existing.lastGood = existing.lastGood || {};
                 existing.lastGood.anthropic = 'anthropic:default';
                 fs.writeFileSync(authPath, JSON.stringify(existing, null, 2));
