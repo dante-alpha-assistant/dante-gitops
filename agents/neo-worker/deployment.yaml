@@ -104,7 +104,7 @@ spec:
                 },
                 agents: {
                   defaults: {
-                    model: { primary: "openrouter/anthropic/claude-sonnet-4-6" },
+                    model: { primary: "anthropic/claude-sonnet-4-6" },
                     workspace: "/root/.openclaw/workspace",
                     compaction: { mode: "safeguard" },
                     maxConcurrent: 4,
