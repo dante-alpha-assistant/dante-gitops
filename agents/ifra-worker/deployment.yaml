@@ -18,292 +18,188 @@ spec:
       labels:
         app: ifra-worker
         role: worker
+      annotations:
+        secret.reloader.stakater.com/reload: ifra-worker-env
     spec:
       initContainers:
-        - name: init-config
-          image: node:22-bookworm-slim
-          command: ["node", "-e"]
-          args:
-            - |
-              const fs = require('fs');
-              const e = process.env;
-              const config = {
-                gateway: {
-                  port: 18789,
-                  mode: "local",
-                  bind: "lan",
-                  auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "" },
-                  tools: { allow: ["sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] },
-                  controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
-                },
-                models: {
-                  providers: {
-                    anthropic: {
-                      baseUrl: "https://api.anthropic.com",
-                      models: [
-                        { id: "claude-opus-4-6", name: "claude-opus-4-6", api: "anthropic-messages", reasoning: true, input: ["text","image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 }
-                      ]
-                    },
-                    openrouter: {
-                      baseUrl: "https://openrouter.ai/api/v1",
-                      apiKey: e.OPENROUTER_API_KEY || "",
-                      models: [
-                        { id: "anthropic/claude-sonnet-4-6", name: "claude-sonnet-4-6", api: "openai-completions", reasoning: false, input: ["text","image"], cost: { input: 3, output: 15, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 },
-                        { id: "google/gemini-3-pro-preview", name: "gemini-3-pro-preview", api: "openai-completions", reasoning: false, input: ["text","image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1048576, maxTokens: 8192 },
-                        { id: "moonshotai/kimi-k2.5", name: "kimi-k2.5", api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 0.45, output: 2.25, cacheRead: 0.07, cacheWrite: 0 }, contextWindow: 262144, maxTokens: 8192 }
-                      ]
-                    }
-                  }
-                },
-                agents: {
-                  defaults: {
-                    model: { primary: "anthropic/claude-sonnet-4-6" },
-                    workspace: "/root/.openclaw/workspace",
-                    compaction: { mode: "safeguard" },
-                    maxConcurrent: 8,
-                    subagents: { maxConcurrent: 8 },
-                    heartbeat: { every: "5m" }
-                  }
-                },
-                hooks: { enabled: true, token: "ifra-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
-                tools: { sessions: { visibility: "all" } }
-              };
-              fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
-              fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
-              fs.mkdirSync('/root/.openclaw/agents/main/agent', { recursive: true });
-              fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
-
-              // Auth profiles
-              const authProfiles = {
-                "anthropic:default": {
-                  type: "token",
-                  provider: "anthropic",
-                  token: e.ANTHROPIC_API_KEY || ""
-                },
-                "openrouter:default": {
-                  type: "api_key",
-                  provider: "openrouter",
-                  key: e.OPENROUTER_API_KEY || ""
-                }
-              };
-              fs.writeFileSync('/root/.openclaw/agents/main/agent/auth-profiles.json', JSON.stringify(authProfiles, null, 2));
-
-              // HEARTBEAT.md — agent card self-update
-              const hbPath = '/root/.openclaw/workspace/HEARTBEAT.md';
-              const agentId = 'ifra-worker';
-              const sbUrl = 'https://lessxkxujvcmublgwdaa.supabase.co';
-              const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI';
-              const heartbeat = [
-                '# HEARTBEAT.md — Agent Card Self-Update + Model Health Check',
-                '',
-                'Run these steps IN ORDER every heartbeat. Do NOT modify any commands.',
-                '',
-                '## Step 1: Check current status',
-                '',
-                '```bash',
-                `STATUS=$(curl -s "${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}&select=status" \\`,
-                `  -H "apikey: ${sbKey}" \\`,
-                `  -H "Authorization: Bearer ${sbKey}" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)`,
-                'echo "Current status: $STATUS"',
-                '```',
-                '',
-                'If status is "disabled", skip everything and reply HEARTBEAT_OK.',
-                '',
-                '## Step 2: Model health verified',
-                '',
-                'If you are reading and executing this, your model API is healthy.',
-                '(A broken model would cause this heartbeat session to fail before reaching here.)',
-                '',
-                '## Step 3: Update agent card — online + model_health ok',
-                '',
-                '```bash',
-                `curl -s -X PATCH "${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}" \\`,
-                `  -H "apikey: ${sbKey}" \\`,
-                `  -H "Authorization: Bearer ${sbKey}" \\`,
-                '  -H "Content-Type: application/json" \\',
-                `  -d '{"status":"online","last_heartbeat":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","metadata":{"model_health":"ok","model_health_at":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}}'`,
-                '```',
-                '',
-                'If the curl succeeds, reply HEARTBEAT_OK.',
-              ].join('\\n');
-              if (!fs.existsSync(hbPath) || fs.readFileSync(hbPath, 'utf8').includes('Keep this file empty')) {
-                fs.writeFileSync(hbPath, heartbeat);
-              }
-              // Seed heartbeat cron job
-              const cronDir = '/root/.openclaw/cron';
-              const cronPath = cronDir + '/jobs.json';
-              fs.mkdirSync(cronDir, { recursive: true });
-              if (!fs.existsSync(cronPath)) {
-                const cronJobs = {
-                  version: 1,
-                  jobs: [{
-                    id: 'heartbeat-agent-card',
-                    name: 'heartbeat-agent-card',
-                    enabled: true,
-                    createdAtMs: Date.now(),
-                    updatedAtMs: Date.now(),
-                    schedule: { kind: 'every', everyMs: 300000, anchorMs: Date.now() },
-                    sessionTarget: 'isolated',
-                    wakeMode: 'now',
-                    payload: { kind: 'agentTurn', message: 'Run the heartbeat: update your agent card. Read HEARTBEAT.MD and follow it.', timeoutSeconds: 30 },
-                    delivery: { mode: 'none', channel: 'last' },
-                    state: { nextRunAtMs: Date.now() + 300000 }
-                  }]
-                };
-                fs.writeFileSync(cronPath, JSON.stringify(cronJobs, null, 2));
-              }
-              // SOUL.md for ifra-worker
-              const soulPath = '/root/.openclaw/workspace/SOUL.md';
-              fs.writeFileSync(soulPath, [
-                '# SOUL.md - ifra-worker',
-                '',
-                'You are **ifra-worker**, a headless coding agent. You receive tasks from the dispatcher and execute them.',
-                '',
-                '## Core Rules',
-                '- You are a CODER. Your job is to write code, create PRs, and update task status.',
-                '- ALWAYS use the coding-task skill when you receive a dispatched task.',
-                '- NEVER try to edit files without cloning the repo first.',
-                '- ALWAYS create a feature branch, never commit to main directly.',
-                '- ALWAYS create a PR with a clear title and description.',
-                '- ALWAYS update task status when done (done on success, failed on error).',
-                '',
-                '## Environment',
-                '- GH_TOKEN is available as an env var for git operations',
-                '- Git user: Neo <dante-neo-assistant@proton.me>',
-                '- Workspace: /root/.openclaw/workspace/',
-              ].join('\n'));
-
-              // AGENTS.md
-              const agentsPath = '/root/.openclaw/workspace/AGENTS.md';
-              fs.writeFileSync(agentsPath, [
-                '# AGENTS.md - ifra-worker',
-                '',
-                '## Every Session',
-                '1. Read SOUL.md',
-                '2. When receiving a task, follow the coding-task skill',
-                '',
-                '## Git Setup',
-                'Run before any git operations:',
-                'git config --global user.email "dante-neo-assistant@proton.me"',
-                'git config --global user.name "Neo"',
-                '',
-                '## Repos',
-                '- queue-dashboard: https://github.com/dante-alpha-assistant/queue-dashboard',
-                '- task-dispatcher: https://github.com/dante-alpha-assistant/task-dispatcher',
-                '- dante-gitops: https://github.com/dante-alpha-assistant/dante-gitops',
-              ].join('\n'));
-
-              // coding-task skill
-              const skillDir = '/root/.openclaw/workspace/skills/coding-task';
-              fs.mkdirSync(skillDir, { recursive: true });
-              fs.writeFileSync(skillDir + '/SKILL.md', [
-                '# coding-task Skill',
-                '',
-                'Use this skill when you receive a task from the dispatcher (contains a JSON block with task_id).',
-                '',
-                '## Steps',
-                '',
-                '### 1. Parse the task',
-                '- Extract task_id, title, description, repo from the JSON payload',
-                '',
-                '### 2. Setup git',
-                'git config --global user.email "dante-neo-assistant@proton.me"',
-                'git config --global user.name "Neo"',
-                '',
-                '### 3. Clone or update the repo',
-                'If repo not yet cloned in workspace:',
-                '  cd /root/.openclaw/workspace',
-                '  git clone https://x-access-token:${GH_TOKEN}@github.com/{owner}/{repo}.git',
-                'If already cloned:',
-                '  cd /root/.openclaw/workspace/{repo}',
-                '  git checkout main && git pull origin main',
-                '',
-                '### 4. Create a feature branch',
-                '  git checkout -b feat/{short-task-description}',
-                '',
-                '### 5. Make changes',
-                '- Read existing code to understand the codebase',
-                '- Keep changes focused on what the task asks for',
-                '',
-                '### 6. Commit and push',
-                '  git add -A',
-                '  git commit -m "{type}: {description}"',
-                '  git push -u origin feat/{short-task-description}',
-                '',
-                '### 7. Create PR',
-                '  gh pr create --title "{task title}" --body "Closes task {task_id}" --base main',
-                '',
-                '### 8. Update task status',
-                'Use the curl command from the task payload. Include PR reference in result.',
-                '',
-                '## Important',
-                '- NEVER edit files without cloning the repo first',
-                '- NEVER commit to main directly',
-                '- If the task is unclear, set status to failed with explanation',
-              ].join('\n'));
-
-              
-              // --- Write auth-profiles.json from env var (gitops-managed) ---
-              const authDir = '/root/.openclaw/agents/main/agent';
-              const authPath = authDir + '/auth-profiles.json';
-              fs.mkdirSync(authDir, { recursive: true });
-              const apiKey = e.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '';
-              if (apiKey) {
-                let existing = {};
-                try { existing = JSON.parse(fs.readFileSync(authPath, 'utf8')); } catch(_) {}
-                existing.version = 1;
-                existing.profiles = existing.profiles || {};
-                const isOAuth = apiKey.startsWith('sk-ant-oat01-');
-                existing.profiles['anthropic:default'] = isOAuth
-                  ? { type: 'oauth', provider: 'anthropic', access: apiKey }
-                  : { type: 'api_key', provider: 'anthropic', key: apiKey };
-                existing.lastGood = existing.lastGood || {};
-                existing.lastGood.anthropic = 'anthropic:default';
-                fs.writeFileSync(authPath, JSON.stringify(existing, null, 2));
-                console.log('auth-profiles.json written from ANTHROPIC_API_KEY');
-              }
-
-              console.log('Ifra-worker config + SOUL.md + coding-task skill written OK');
-          envFrom:
-            - secretRef:
-                name: ifra-worker-env
-          volumeMounts:
-            - name: data
-              mountPath: /root/.openclaw
-      containers:
-        - name: openclaw
-          image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
-          ports:
-            - containerPort: 18789
-          envFrom:
-            - secretRef:
-                name: ifra-worker-env
-          volumeMounts:
-            - name: data
-              mountPath: /root/.openclaw
-          resources:
-            requests:
-              cpu: 500m
-              memory: 512Mi
-            limits:
-              cpu: 2000m
-              memory: 2Gi
-          livenessProbe:
-            tcpSocket:
-              port: 18789
-            initialDelaySeconds: 120
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 5
-          readinessProbe:
-            tcpSocket:
-              port: 18789
-            initialDelaySeconds: 60
-            periodSeconds: 5
-            timeoutSeconds: 5
-      volumes:
+      - name: init-config
+        image: node:22-bookworm-slim
+        command:
+        - node
+        - -e
+        args:
+        - "const fs = require('fs');\nconst e = process.env;\nconst config = {\n \
+          \ gateway: {\n    port: 18789,\n    mode: \"local\",\n    bind: \"lan\"\
+          ,\n    auth: { mode: \"token\", token: e.OPENCLAW_GATEWAY_TOKEN || \"\"\
+          \ },\n    tools: { allow: [\"sessions_spawn\",\"sessions_send\",\"sessions_list\"\
+          ,\"sessions_history\",\"session_status\",\"cron\"] },\n    controlUi: {\
+          \ dangerouslyAllowHostHeaderOriginFallback: true }\n  },\n  models: {\n\
+          \    providers: {\n      anthropic: {\n        baseUrl: \"https://api.anthropic.com\"\
+          ,\n        models: [\n          { id: \"claude-opus-4-6\", name: \"claude-opus-4-6\"\
+          , api: \"anthropic-messages\", reasoning: true, input: [\"text\",\"image\"\
+          ], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow:\
+          \ 200000, maxTokens: 16384 }\n        ]\n      },\n      openrouter: {\n\
+          \        baseUrl: \"https://openrouter.ai/api/v1\",\n        apiKey: e.OPENROUTER_API_KEY\
+          \ || \"\",\n        models: [\n          { id: \"anthropic/claude-sonnet-4-6\"\
+          , name: \"claude-sonnet-4-6\", api: \"openai-completions\", reasoning: false,\
+          \ input: [\"text\",\"image\"], cost: { input: 3, output: 15, cacheRead:\
+          \ 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 },\n     \
+          \     { id: \"google/gemini-3-pro-preview\", name: \"gemini-3-pro-preview\"\
+          , api: \"openai-completions\", reasoning: false, input: [\"text\",\"image\"\
+          ], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow:\
+          \ 1048576, maxTokens: 8192 },\n          { id: \"moonshotai/kimi-k2.5\"\
+          , name: \"kimi-k2.5\", api: \"openai-completions\", reasoning: true, input:\
+          \ [\"text\",\"image\"], cost: { input: 0.45, output: 2.25, cacheRead: 0.07,\
+          \ cacheWrite: 0 }, contextWindow: 262144, maxTokens: 8192 }\n        ]\n\
+          \      }\n    }\n  },\n  agents: {\n    defaults: {\n      model: { primary:\
+          \ \"anthropic/claude-sonnet-4-6\" },\n      workspace: \"/root/.openclaw/workspace\"\
+          ,\n      compaction: { mode: \"safeguard\" },\n      maxConcurrent: 8,\n\
+          \      subagents: { maxConcurrent: 8 },\n      heartbeat: { every: \"5m\"\
+          \ }\n    }\n  },\n  hooks: { enabled: true, token: \"ifra-hooks-tok-2026\"\
+          , allowRequestSessionKey: true, defaultSessionKey: \"hook:default\", allowedSessionKeyPrefixes:\
+          \ [\"hook:\"] },\n  tools: { sessions: { visibility: \"all\" } }\n};\nfs.mkdirSync('/root/.openclaw/workspace',\
+          \ { recursive: true });\nfs.mkdirSync('/root/.openclaw/skills', { recursive:\
+          \ true });\nfs.mkdirSync('/root/.openclaw/agents/main/agent', { recursive:\
+          \ true });\nfs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config,\
+          \ null, 2));\n\n// Auth profiles\nconst authProfiles = {\n  \"anthropic:default\"\
+          : {\n    type: \"token\",\n    provider: \"anthropic\",\n    token: e.ANTHROPIC_API_KEY\
+          \ || \"\"\n  },\n  \"openrouter:default\": {\n    type: \"api_key\",\n \
+          \   provider: \"openrouter\",\n    key: e.OPENROUTER_API_KEY || \"\"\n \
+          \ }\n};\nfs.writeFileSync('/root/.openclaw/agents/main/agent/auth-profiles.json',\
+          \ JSON.stringify(authProfiles, null, 2));\n\n// HEARTBEAT.md \u2014 agent\
+          \ card self-update\nconst hbPath = '/root/.openclaw/workspace/HEARTBEAT.md';\n\
+          const agentId = 'ifra-worker';\nconst sbUrl = 'https://lessxkxujvcmublgwdaa.supabase.co';\n\
+          const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI';\n\
+          const heartbeat = [\n  '# HEARTBEAT.md \u2014 Agent Card Self-Update + Model\
+          \ Health Check',\n  '',\n  'Run these steps IN ORDER every heartbeat. Do\
+          \ NOT modify any commands.',\n  '',\n  '## Step 1: Check current status',\n\
+          \  '',\n  '```bash',\n  `STATUS=$(curl -s \"${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}&select=status\"\
+          \ \\\\`,\n  `  -H \"apikey: ${sbKey}\" \\\\`,\n  `  -H \"Authorization:\
+          \ Bearer ${sbKey}\" | grep -o '\"status\":\"[^\"]*\"' | cut -d'\"' -f4)`,\n\
+          \  'echo \"Current status: $STATUS\"',\n  '```',\n  '',\n  'If status is\
+          \ \"disabled\", skip everything and reply HEARTBEAT_OK.',\n  '',\n  '##\
+          \ Step 2: Model health verified',\n  '',\n  'If you are reading and executing\
+          \ this, your model API is healthy.',\n  '(A broken model would cause this\
+          \ heartbeat session to fail before reaching here.)',\n  '',\n  '## Step\
+          \ 3: Update agent card \u2014 online + model_health ok',\n  '',\n  '```bash',\n\
+          \  `curl -s -X PATCH \"${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}\" \\\
+          \\`,\n  `  -H \"apikey: ${sbKey}\" \\\\`,\n  `  -H \"Authorization: Bearer\
+          \ ${sbKey}\" \\\\`,\n  '  -H \"Content-Type: application/json\" \\\\',\n\
+          \  `  -d '{\"status\":\"online\",\"last_heartbeat\":\"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"\
+          ,\"metadata\":{\"model_health\":\"ok\",\"model_health_at\":\"'$(date -u\
+          \ +%Y-%m-%dT%H:%M:%SZ)'\"}}'`,\n  '```',\n  '',\n  'If the curl succeeds,\
+          \ reply HEARTBEAT_OK.',\n].join('\\\\n');\nif (!fs.existsSync(hbPath) ||\
+          \ fs.readFileSync(hbPath, 'utf8').includes('Keep this file empty')) {\n\
+          \  fs.writeFileSync(hbPath, heartbeat);\n}\n// Seed heartbeat cron job\n\
+          const cronDir = '/root/.openclaw/cron';\nconst cronPath = cronDir + '/jobs.json';\n\
+          fs.mkdirSync(cronDir, { recursive: true });\nif (!fs.existsSync(cronPath))\
+          \ {\n  const cronJobs = {\n    version: 1,\n    jobs: [{\n      id: 'heartbeat-agent-card',\n\
+          \      name: 'heartbeat-agent-card',\n      enabled: true,\n      createdAtMs:\
+          \ Date.now(),\n      updatedAtMs: Date.now(),\n      schedule: { kind: 'every',\
+          \ everyMs: 300000, anchorMs: Date.now() },\n      sessionTarget: 'isolated',\n\
+          \      wakeMode: 'now',\n      payload: { kind: 'agentTurn', message: 'Run\
+          \ the heartbeat: update your agent card. Read HEARTBEAT.MD and follow it.',\
+          \ timeoutSeconds: 30 },\n      delivery: { mode: 'none', channel: 'last'\
+          \ },\n      state: { nextRunAtMs: Date.now() + 300000 }\n    }]\n  };\n\
+          \  fs.writeFileSync(cronPath, JSON.stringify(cronJobs, null, 2));\n}\n//\
+          \ SOUL.md for ifra-worker\nconst soulPath = '/root/.openclaw/workspace/SOUL.md';\n\
+          fs.writeFileSync(soulPath, [\n  '# SOUL.md - ifra-worker',\n  '',\n  'You\
+          \ are **ifra-worker**, a headless coding agent. You receive tasks from the\
+          \ dispatcher and execute them.',\n  '',\n  '## Core Rules',\n  '- You are\
+          \ a CODER. Your job is to write code, create PRs, and update task status.',\n\
+          \  '- ALWAYS use the coding-task skill when you receive a dispatched task.',\n\
+          \  '- NEVER try to edit files without cloning the repo first.',\n  '- ALWAYS\
+          \ create a feature branch, never commit to main directly.',\n  '- ALWAYS\
+          \ create a PR with a clear title and description.',\n  '- ALWAYS update\
+          \ task status when done (done on success, failed on error).',\n  '',\n \
+          \ '## Environment',\n  '- GH_TOKEN is available as an env var for git operations',\n\
+          \  '- Git user: Neo <dante-neo-assistant@proton.me>',\n  '- Workspace: /root/.openclaw/workspace/',\n\
+          ].join('\\n'));\n\n// AGENTS.md\nconst agentsPath = '/root/.openclaw/workspace/AGENTS.md';\n\
+          fs.writeFileSync(agentsPath, [\n  '# AGENTS.md - ifra-worker',\n  '',\n\
+          \  '## Every Session',\n  '1. Read SOUL.md',\n  '2. When receiving a task,\
+          \ follow the coding-task skill',\n  '',\n  '## Git Setup',\n  'Run before\
+          \ any git operations:',\n  'git config --global user.email \"dante-neo-assistant@proton.me\"\
+          ',\n  'git config --global user.name \"Neo\"',\n  '',\n  '## Repos',\n \
+          \ '- queue-dashboard: https://github.com/dante-alpha-assistant/queue-dashboard',\n\
+          \  '- task-dispatcher: https://github.com/dante-alpha-assistant/task-dispatcher',\n\
+          \  '- dante-gitops: https://github.com/dante-alpha-assistant/dante-gitops',\n\
+          ].join('\\n'));\n\n// coding-task skill\nconst skillDir = '/root/.openclaw/workspace/skills/coding-task';\n\
+          fs.mkdirSync(skillDir, { recursive: true });\nfs.writeFileSync(skillDir\
+          \ + '/SKILL.md', [\n  '# coding-task Skill',\n  '',\n  'Use this skill when\
+          \ you receive a task from the dispatcher (contains a JSON block with task_id).',\n\
+          \  '',\n  '## Steps',\n  '',\n  '### 1. Parse the task',\n  '- Extract task_id,\
+          \ title, description, repo from the JSON payload',\n  '',\n  '### 2. Setup\
+          \ git',\n  'git config --global user.email \"dante-neo-assistant@proton.me\"\
+          ',\n  'git config --global user.name \"Neo\"',\n  '',\n  '### 3. Clone or\
+          \ update the repo',\n  'If repo not yet cloned in workspace:',\n  '  cd\
+          \ /root/.openclaw/workspace',\n  '  git clone https://x-access-token:${GH_TOKEN}@github.com/{owner}/{repo}.git',\n\
+          \  'If already cloned:',\n  '  cd /root/.openclaw/workspace/{repo}',\n \
+          \ '  git checkout main && git pull origin main',\n  '',\n  '### 4. Create\
+          \ a feature branch',\n  '  git checkout -b feat/{short-task-description}',\n\
+          \  '',\n  '### 5. Make changes',\n  '- Read existing code to understand\
+          \ the codebase',\n  '- Keep changes focused on what the task asks for',\n\
+          \  '',\n  '### 6. Commit and push',\n  '  git add -A',\n  '  git commit\
+          \ -m \"{type}: {description}\"',\n  '  git push -u origin feat/{short-task-description}',\n\
+          \  '',\n  '### 7. Create PR',\n  '  gh pr create --title \"{task title}\"\
+          \ --body \"Closes task {task_id}\" --base main',\n  '',\n  '### 8. Update\
+          \ task status',\n  'Use the curl command from the task payload. Include\
+          \ PR reference in result.',\n  '',\n  '## Important',\n  '- NEVER edit files\
+          \ without cloning the repo first',\n  '- NEVER commit to main directly',\n\
+          \  '- If the task is unclear, set status to failed with explanation',\n\
+          ].join('\\n'));\n\n\n// --- Write auth-profiles.json from env var (gitops-managed)\
+          \ ---\nconst authDir = '/root/.openclaw/agents/main/agent';\nconst authPath\
+          \ = authDir + '/auth-profiles.json';\nfs.mkdirSync(authDir, { recursive:\
+          \ true });\nconst apiKey = e.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY\
+          \ || '';\nif (apiKey) {\n  let existing = {};\n  try { existing = JSON.parse(fs.readFileSync(authPath,\
+          \ 'utf8')); } catch(_) {}\n  existing.version = 1;\n  existing.profiles\
+          \ = existing.profiles || {};\n  const isOAuth = apiKey.startsWith('sk-ant-oat01-');\n\
+          \  existing.profiles['anthropic:default'] = isOAuth\n    ? { type: 'oauth',\
+          \ provider: 'anthropic', access: apiKey }\n    : { type: 'api_key', provider:\
+          \ 'anthropic', key: apiKey };\n  existing.lastGood = existing.lastGood ||\
+          \ {};\n  existing.lastGood.anthropic = 'anthropic:default';\n  fs.writeFileSync(authPath,\
+          \ JSON.stringify(existing, null, 2));\n  console.log('auth-profiles.json\
+          \ written from ANTHROPIC_API_KEY');\n}\n\nconsole.log('Ifra-worker config\
+          \ + SOUL.md + coding-task skill written OK');\n"
+        envFrom:
+        - secretRef:
+            name: ifra-worker-env
+        volumeMounts:
         - name: data
-          persistentVolumeClaim:
-            claimName: ifra-data
+          mountPath: /root/.openclaw
+      containers:
+      - name: openclaw
+        image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+        ports:
+        - containerPort: 18789
+        envFrom:
+        - secretRef:
+            name: ifra-worker-env
+        volumeMounts:
+        - name: data
+          mountPath: /root/.openclaw
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        livenessProbe:
+          tcpSocket:
+            port: 18789
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+        readinessProbe:
+          tcpSocket:
+            port: 18789
+          initialDelaySeconds: 60
+          periodSeconds: 5
+          timeoutSeconds: 5
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: ifra-data
       imagePullSecrets:
-        - name: ghcr-secret
+      - name: ghcr-secret

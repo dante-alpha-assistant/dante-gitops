@@ -21,183 +21,199 @@ spec:
       labels:
         app: beta-worker
         role: agent
+      annotations:
+        secret.reloader.stakater.com/reload: beta-worker-env
     spec:
       initContainers:
-        - name: init-tools
-          image: debian:bookworm-slim
-          command: ["/bin/bash", "-c"]
-          args:
-            - |
-              set -e
-              apt-get update -qq && apt-get install -y -qq curl ca-certificates openssh-client > /dev/null 2>&1
-              KUBE_VER=v1.31.0
-              curl -sL "https://dl.k8s.io/release/${KUBE_VER}/bin/linux/amd64/kubectl" -o /tools/kubectl
-              chmod +x /tools/kubectl
-              SSH_DIR=/data/.ssh
-              mkdir -p "$SSH_DIR"
-              ssh-keygen -t ed25519 -f "$SSH_DIR/id_ed25519" -N "" -q
-              ssh-keyscan github.com 167.235.61.168 >> "$SSH_DIR/known_hosts" 2>/dev/null
-              sort -u "$SSH_DIR/known_hosts" -o "$SSH_DIR/known_hosts"
-              chmod 700 "$SSH_DIR" && chmod 600 "$SSH_DIR/id_ed25519" && chmod 644 "$SSH_DIR/id_ed25519.pub"
-              [ -f "$SSH_DIR/known_hosts" ] && chmod 644 "$SSH_DIR/known_hosts"
-              mkdir -p /ssh-out
-              cp "$SSH_DIR/id_ed25519" /ssh-out/id_ed25519
-              cp "$SSH_DIR/id_ed25519.pub" /ssh-out/id_ed25519.pub
-              [ -f "$SSH_DIR/known_hosts" ] && cp "$SSH_DIR/known_hosts" /ssh-out/known_hosts
-              chmod 600 /ssh-out/id_ed25519 && chmod 644 /ssh-out/id_ed25519.pub
-              [ -f /ssh-out/known_hosts ] && chmod 644 /ssh-out/known_hosts
-              echo "Tools + SSH ready"
-          volumeMounts:
-            - name: tools-bin
-              mountPath: /tools
-            - name: data
-              mountPath: /data
-            - name: ssh-out
-              mountPath: /ssh-out
-        - name: init-config
-          image: node:22-bookworm-slim
-          command: ["node", "-e"]
-          args:
-            - |
-              const fs = require('fs');
-              const e = process.env;
-              const config = {
-                gateway: {
-                  port: 18789,
-                  mode: "local",
-                  bind: "lan",
-                  auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "beta-worker-gw-tok-2026" },
-                  tools: { allow: ["Read","Write","Edit","exec","web_fetch","sessions_spawn","sessions_send","sessions_list","sessions_history","session_status"] },
-                  controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
-                },
-                models: {
-                  providers: {
-                    openrouter: {
-                      baseUrl: "https://openrouter.ai/api/v1",
-                      apiKey: e.OPENROUTER_API_KEY || "",
-                      models: [
-                        { id: "moonshotai/kimi-k2.5", name: "kimi-k2.5", api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 0.45, output: 2.25 }, contextWindow: 262144, maxTokens: 16384 }
-                      ]
-                    }
-                  }
-                },
-                agents: {
-                  defaults: {
-                    model: { primary: "openrouter/moonshotai/kimi-k2.5" },
-                    workspace: "/root/.openclaw/workspace",
-                    compaction: { mode: "safeguard" },
-                    maxConcurrent: 2
-                  }
-                },
-                hooks: { enabled: true, token: e.HOOKS_TOKEN || "beta-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
-                tools: { sessions: { visibility: "all" } }
-              };
-              fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
-              fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
-              fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
-              // Minimal workspace files
-              fs.writeFileSync('/root/.openclaw/workspace/AGENTS.md', '# QA Worker\nYou are a QA testing agent for the Dante fleet.\nReview tasks, verify work quality, update status.\nDo NOT create memory files.\n');
-              fs.writeFileSync('/root/.openclaw/workspace/SOUL.md', '# SOUL.md - Beta Worker\n\nYou are **beta-worker** — a headless QA testing agent.\n\n## Role\n- Review completed tasks for quality\n- Check code, test coverage, edge cases\n- Update task status to completed or failed\n- Provide specific, actionable feedback\n\n## Rules\n- Be thorough but fast (20 min per task)\n- Never delete tasks\n- Use curl for Supabase API calls\n');
-              // Remove default files that bloat system prompt
-              for (const f of ['BOOTSTRAP.md','IDENTITY.md','TOOLS.md','USER.md','HEARTBEAT.md','MEMORY.md']) {
-                try { fs.unlinkSync('/root/.openclaw/workspace/' + f); } catch(e) {}
-              }
-              console.log('Beta-worker config written — QA agent, kimi-k2.5, maxTokens 16384');
-          env:
-            - name: OPENROUTER_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: beta-worker-env
-                  key: OPENROUTER_API_KEY
-            - name: OPENCLAW_GATEWAY_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: beta-worker-env
-                  key: OPENCLAW_GATEWAY_TOKEN
-            - name: HOOKS_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: beta-worker-env
-                  key: HOOKS_TOKEN
-          volumeMounts:
-            - name: data
-              mountPath: /root/.openclaw
-      containers:
-        - name: openclaw
-          image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
-          imagePullPolicy: Always
-          ports:
-            - containerPort: 18789
-          env:
-            - name: OPENROUTER_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: beta-worker-env
-                  key: OPENROUTER_API_KEY
-            - name: OPENCLAW_GATEWAY_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: beta-worker-env
-                  key: OPENCLAW_GATEWAY_TOKEN
-            - name: GH_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: beta-worker-env
-                  key: GH_TOKEN
-            - name: HOOKS_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: beta-worker-env
-                  key: HOOKS_TOKEN
-            - name: SUPABASE_SERVICE_ROLE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: beta-worker-env
-                  key: SUPABASE_SERVICE_ROLE_KEY
-            - name: SUPABASE_MGMT_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: beta-worker-env
-                  key: SUPABASE_MGMT_TOKEN
-            - name: PATH
-              value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-            - name: NODE_OPTIONS
-              value: "--max-old-space-size=1536"
-          volumeMounts:
-            - name: data
-              mountPath: /root/.openclaw
-            - name: tools-bin
-              mountPath: /tools
-              readOnly: true
-            - name: ssh-out
-              mountPath: /root/.ssh
-              readOnly: true
-          resources:
-            requests:
-              cpu: 250m
-              memory: 512Mi
-            limits:
-              cpu: 1000m
-              memory: 2Gi
-          readinessProbe:
-            tcpSocket:
-              port: 18789
-            initialDelaySeconds: 90
-            periodSeconds: 10
-            timeoutSeconds: 5
-          livenessProbe:
-            tcpSocket:
-              port: 18789
-            initialDelaySeconds: 180
-            periodSeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 5
-      volumes:
-        - name: data
-          emptyDir: {}
+      - name: init-tools
+        image: debian:bookworm-slim
+        command:
+        - /bin/bash
+        - -c
+        args:
+        - 'set -e
+
+          apt-get update -qq && apt-get install -y -qq curl ca-certificates openssh-client
+          > /dev/null 2>&1
+
+          KUBE_VER=v1.31.0
+
+          curl -sL "https://dl.k8s.io/release/${KUBE_VER}/bin/linux/amd64/kubectl"
+          -o /tools/kubectl
+
+          chmod +x /tools/kubectl
+
+          SSH_DIR=/data/.ssh
+
+          mkdir -p "$SSH_DIR"
+
+          ssh-keygen -t ed25519 -f "$SSH_DIR/id_ed25519" -N "" -q
+
+          ssh-keyscan github.com 167.235.61.168 >> "$SSH_DIR/known_hosts" 2>/dev/null
+
+          sort -u "$SSH_DIR/known_hosts" -o "$SSH_DIR/known_hosts"
+
+          chmod 700 "$SSH_DIR" && chmod 600 "$SSH_DIR/id_ed25519" && chmod 644 "$SSH_DIR/id_ed25519.pub"
+
+          [ -f "$SSH_DIR/known_hosts" ] && chmod 644 "$SSH_DIR/known_hosts"
+
+          mkdir -p /ssh-out
+
+          cp "$SSH_DIR/id_ed25519" /ssh-out/id_ed25519
+
+          cp "$SSH_DIR/id_ed25519.pub" /ssh-out/id_ed25519.pub
+
+          [ -f "$SSH_DIR/known_hosts" ] && cp "$SSH_DIR/known_hosts" /ssh-out/known_hosts
+
+          chmod 600 /ssh-out/id_ed25519 && chmod 644 /ssh-out/id_ed25519.pub
+
+          [ -f /ssh-out/known_hosts ] && chmod 644 /ssh-out/known_hosts
+
+          echo "Tools + SSH ready"
+
+          '
+        volumeMounts:
         - name: tools-bin
-          emptyDir: {}
+          mountPath: /tools
+        - name: data
+          mountPath: /data
         - name: ssh-out
-          emptyDir: {}
+          mountPath: /ssh-out
+      - name: init-config
+        image: node:22-bookworm-slim
+        command:
+        - node
+        - -e
+        args:
+        - "const fs = require('fs');\nconst e = process.env;\nconst config = {\n \
+          \ gateway: {\n    port: 18789,\n    mode: \"local\",\n    bind: \"lan\"\
+          ,\n    auth: { mode: \"token\", token: e.OPENCLAW_GATEWAY_TOKEN || \"beta-worker-gw-tok-2026\"\
+          \ },\n    tools: { allow: [\"Read\",\"Write\",\"Edit\",\"exec\",\"web_fetch\"\
+          ,\"sessions_spawn\",\"sessions_send\",\"sessions_list\",\"sessions_history\"\
+          ,\"session_status\"] },\n    controlUi: { dangerouslyAllowHostHeaderOriginFallback:\
+          \ true }\n  },\n  models: {\n    providers: {\n      openrouter: {\n   \
+          \     baseUrl: \"https://openrouter.ai/api/v1\",\n        apiKey: e.OPENROUTER_API_KEY\
+          \ || \"\",\n        models: [\n          { id: \"moonshotai/kimi-k2.5\"\
+          , name: \"kimi-k2.5\", api: \"openai-completions\", reasoning: true, input:\
+          \ [\"text\",\"image\"], cost: { input: 0.45, output: 2.25 }, contextWindow:\
+          \ 262144, maxTokens: 16384 }\n        ]\n      }\n    }\n  },\n  agents:\
+          \ {\n    defaults: {\n      model: { primary: \"openrouter/moonshotai/kimi-k2.5\"\
+          \ },\n      workspace: \"/root/.openclaw/workspace\",\n      compaction:\
+          \ { mode: \"safeguard\" },\n      maxConcurrent: 2\n    }\n  },\n  hooks:\
+          \ { enabled: true, token: e.HOOKS_TOKEN || \"beta-worker-hooks-tok-2026\"\
+          , allowRequestSessionKey: true, defaultSessionKey: \"hook:default\", allowedSessionKeyPrefixes:\
+          \ [\"hook:\"] },\n  tools: { sessions: { visibility: \"all\" } }\n};\nfs.mkdirSync('/root/.openclaw/workspace',\
+          \ { recursive: true });\nfs.mkdirSync('/root/.openclaw/skills', { recursive:\
+          \ true });\nfs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config,\
+          \ null, 2));\n// Minimal workspace files\nfs.writeFileSync('/root/.openclaw/workspace/AGENTS.md',\
+          \ '# QA Worker\\nYou are a QA testing agent for the Dante fleet.\\nReview\
+          \ tasks, verify work quality, update status.\\nDo NOT create memory files.\\\
+          n');\nfs.writeFileSync('/root/.openclaw/workspace/SOUL.md', '# SOUL.md -\
+          \ Beta Worker\\n\\nYou are **beta-worker** \u2014 a headless QA testing\
+          \ agent.\\n\\n## Role\\n- Review completed tasks for quality\\n- Check code,\
+          \ test coverage, edge cases\\n- Update task status to completed or failed\\\
+          n- Provide specific, actionable feedback\\n\\n## Rules\\n- Be thorough but\
+          \ fast (20 min per task)\\n- Never delete tasks\\n- Use curl for Supabase\
+          \ API calls\\n');\n// Remove default files that bloat system prompt\nfor\
+          \ (const f of ['BOOTSTRAP.md','IDENTITY.md','TOOLS.md','USER.md','HEARTBEAT.md','MEMORY.md'])\
+          \ {\n  try { fs.unlinkSync('/root/.openclaw/workspace/' + f); } catch(e)\
+          \ {}\n}\nconsole.log('Beta-worker config written \u2014 QA agent, kimi-k2.5,\
+          \ maxTokens 16384');\n"
+        env:
+        - name: OPENROUTER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: beta-worker-env
+              key: OPENROUTER_API_KEY
+        - name: OPENCLAW_GATEWAY_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: beta-worker-env
+              key: OPENCLAW_GATEWAY_TOKEN
+        - name: HOOKS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: beta-worker-env
+              key: HOOKS_TOKEN
+        volumeMounts:
+        - name: data
+          mountPath: /root/.openclaw
+      containers:
+      - name: openclaw
+        image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 18789
+        env:
+        - name: OPENROUTER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: beta-worker-env
+              key: OPENROUTER_API_KEY
+        - name: OPENCLAW_GATEWAY_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: beta-worker-env
+              key: OPENCLAW_GATEWAY_TOKEN
+        - name: GH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: beta-worker-env
+              key: GH_TOKEN
+        - name: HOOKS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: beta-worker-env
+              key: HOOKS_TOKEN
+        - name: SUPABASE_SERVICE_ROLE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: beta-worker-env
+              key: SUPABASE_SERVICE_ROLE_KEY
+        - name: SUPABASE_MGMT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: beta-worker-env
+              key: SUPABASE_MGMT_TOKEN
+        - name: PATH
+          value: /tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+        - name: NODE_OPTIONS
+          value: --max-old-space-size=1536
+        volumeMounts:
+        - name: data
+          mountPath: /root/.openclaw
+        - name: tools-bin
+          mountPath: /tools
+          readOnly: true
+        - name: ssh-out
+          mountPath: /root/.ssh
+          readOnly: true
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        readinessProbe:
+          tcpSocket:
+            port: 18789
+          initialDelaySeconds: 90
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          tcpSocket:
+            port: 18789
+          initialDelaySeconds: 180
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 5
+      volumes:
+      - name: data
+        emptyDir: {}
+      - name: tools-bin
+        emptyDir: {}
+      - name: ssh-out
+        emptyDir: {}
       imagePullSecrets:
-        - name: ghcr-secret
+      - name: ghcr-secret
