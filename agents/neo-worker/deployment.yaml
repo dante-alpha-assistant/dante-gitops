@@ -7,7 +7,7 @@ metadata:
     app: neo-worker
     role: agent
 spec:
-  replicas: 2
+  replicas: 4
   strategy:
     type: RollingUpdate
   selector:
