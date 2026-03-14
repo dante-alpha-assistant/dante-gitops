@@ -114,7 +114,23 @@ spec:
           \ test coverage, edge cases\\n- Update task status to completed or failed\\\
           n- Provide specific, actionable feedback\\n\\n## Rules\\n- Be thorough but\
           \ fast (20 min per task)\\n- Never delete tasks\\n- Use curl for Supabase\
-          \ API calls\\n');\n// Remove default files that bloat system prompt\nfor\
+          \ API calls\\n\\n## Browser-Based QA (MANDATORY)\\n\\nFor any frontend\
+          \ task, you MUST use the browser tool to verify rendering:\\n\\n1. **Take\
+          \ a screenshot** of every key page and confirm it renders non-blank content.\
+          \\ A completely blank page = automatic QA failure, even if the server returns\
+          \ 200.\\n2. **Check browser console** after loading each page. Any uncaught\
+          \ errors or red console messages = automatic QA failure (unless explicitly\
+          \ whitelisted by the task).\\n3. **Verify these smoke URLs for queue-dashboard**\
+          \ on every QA run: / (dashboard), /apps/new (step 1 of onboarding wizard),\
+          \ /apps/new?step=1 (same, verify step renders).\\n4. **Never use curl alone**\
+          \ to validate a React/Vite SPA. curl only checks HTTP 200 — it cannot catch\
+          \ blank pages caused by missing JS chunks, MIME errors, or runtime exceptions.\\n\
+          5. **Verify JS assets load**: After taking a screenshot, open DevTools Network\
+          \ tab (or use browser console) and confirm no JS files returned text/html\
+          \ instead of application/javascript.\\n\\n## QA Failure Criteria\\n- Blank\
+          \ page in browser (regardless of HTTP status)\\n- Console errors (TypeError,\
+          \ Failed to fetch, MIME type mismatch)\\n- Missing UI elements that the\
+          \ task claims to implement\\n- HTTP 4xx/5xx on any smoke URL\\n');\n// Remove default files that bloat system prompt\nfor\
           \ (const f of ['BOOTSTRAP.md','IDENTITY.md','TOOLS.md','USER.md','HEARTBEAT.md','MEMORY.md'])\
           \ {\n  try { fs.unlinkSync('/root/.openclaw/workspace/' + f); } catch(e)\
           \ {}\n}\nconsole.log('Beta-worker config written \u2014 QA agent, kimi-k2.5,\
