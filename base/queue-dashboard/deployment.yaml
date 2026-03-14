@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   name: queue-dashboard
   annotations:
+    deploy/commit: "02cedabab4952382dffca899676be2044e971dfc"
 spec:
   replicas: 1
   selector:
