@@ -99,7 +99,7 @@ spec:
           \ 262144, maxTokens: 16384 }\n        ]\n      }\n    }\n  },\n  agents:\
           \ {\n    defaults: {\n      model: { primary: \"openrouter/moonshotai/kimi-k2.5\"\
           \ },\n      workspace: \"/root/.openclaw/workspace\",\n      compaction:\
-          \ { mode: \"safeguard\" },\n      maxConcurrent: 2\n    }\n  },\n  hooks:\
+          \ { mode: \"safeguard\" },\n      maxConcurrent: 2,\n      sandbox: { browser: { enabled: true, headless: true } }\n    }\n  },\n  hooks:\
           \ { enabled: true, token: e.HOOKS_TOKEN || \"beta-worker-hooks-tok-2026\"\
           , allowRequestSessionKey: true, defaultSessionKey: \"hook:default\", allowedSessionKeyPrefixes:\
           \ [\"hook:\"] },\n  tools: { sessions: { visibility: \"all\" } }\n};\nfs.mkdirSync('/root/.openclaw/workspace',\

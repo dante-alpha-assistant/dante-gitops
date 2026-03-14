@@ -53,7 +53,7 @@ spec:
           \ cacheWrite: 0 }, contextWindow: 262144, maxTokens: 8192 }\n        ]\n\
           \      }\n    }\n  },\n  agents: {\n    defaults: {\n      model: { primary:\
           \ \"anthropic/claude-sonnet-4-6\" },\n      workspace: \"/root/.openclaw/workspace\"\
-          ,\n      compaction: { mode: \"safeguard\" },\n      maxConcurrent: 8,\n\
+          ,\n      compaction: { mode: \"safeguard\" },\n      maxConcurrent: 8,\n      sandbox: { browser: { enabled: true, headless: true } }\n\
           \      subagents: { maxConcurrent: 8 },\n      heartbeat: { every: \"5m\"\
           \ }\n    }\n  },\n  hooks: { enabled: true, token: \"ifra-hooks-tok-2026\"\
           , allowRequestSessionKey: true, defaultSessionKey: \"hook:default\", allowedSessionKeyPrefixes:\
