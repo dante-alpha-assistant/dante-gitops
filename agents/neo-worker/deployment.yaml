@@ -91,7 +91,7 @@ spec:
           \      subagents: { maxConcurrent: 8 },\n      heartbeat: { every: \"5m\"\
           \ }\n    }\n  },\n  hooks: { enabled: true, token: \"neo-worker-hooks-tok-2026\"\
           , allowRequestSessionKey: true, defaultSessionKey: \"hook:default\", allowedSessionKeyPrefixes:\
-          \ [\"hook:\"] },\n  tools: { sessions: { visibility: \"all\" } }\n};\nfs.mkdirSync('/root/.openclaw/workspace',\
+          \ [\"hook:\"] },\n  tools: { sessions: { visibility: \"all\" } },\n  acp: { enabled: true, backend: \"acpx\", defaultAgent: \"codex\", allowedAgents: [\"codex\",\"claude\"], maxConcurrentSessions: 4, stream: { coalesceIdleMs: 300, maxChunkChars: 1200 }, runtime: { ttlMinutes: 60 } },\n  plugins: { entries: { acpx: { enabled: true, config: { permissionMode: \"approve-all\", nonInteractivePermissions: \"deny\" } } } }\n};\nfs.mkdirSync('/root/.openclaw/workspace',\
           \ { recursive: true });\nfs.mkdirSync('/root/.openclaw/skills', { recursive:\
           \ true });\nfs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config,\
           \ null, 2));\n// HEARTBEAT.md \u2014 agent card self-update\nconst hbPath\
