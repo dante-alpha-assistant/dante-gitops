@@ -194,11 +194,11 @@ spec:
           \ title and description.',\n  '- ALWAYS update task status when done (done\
           \ on success, failed on error).',\n  '- ALWAYS run pre-push checks: `node\
           \ --check` on modified JS files + `npm run build` for frontend.',\n  '',\n\
-          \  '## Codex / Claude Code \u2014 Your Coding Tools',\n  '- For ALL coding work, spawn\
+          \  '## Coding via Sub-Agent Delegation (MANDATORY) \u2014 Your Coding Tools',\n  '- For ALL coding work, spawn\
           \ Codex: `codex --full-auto exec \"prompt\"`',\n  '- You\
-          \ orchestrate: clone repo \u2192 create branch \u2192 spawn codex \u2192\
+          \ orchestrate: clone repo \u2192 create branch \u2192 spawn sub-agent \u2192\
           \ verify build \u2192 create PR',\n  '- Codex does the actual coding. You\
-          \ handle git, PR, task status, and quality gates.',\n  '- If Codex fails,\
+          \ handle git, PR, task status, and quality gates.',\n  '- If sub-agent fails,\
           \ retry once with a clearer prompt. If it fails again, mark task as failed.',\n\
           \  '',\n  '## Progress Comments (CRITICAL - prevents idle timeout!)',\n          \  '',\n  'You MUST post progress comments to the task at every stage.',\n          \  'The dispatcher monitors activity. 15min without a Supabase write = session killed.',\n          \  'Comments reset the idle timer.',\n  '',\n  '### Mandatory checkpoints:',\n          \  '1. Cloning repo... - right after you start (within 30s)',\n          \  '2. Created branch feat/xxx - after creating feature branch',\n          \  '3. Spawning Codex/Claude Code... - before launching coding agent',\n          \  '4. Coding agent working... - every 5min heartbeat while agent runs',\n          \  '5. Running pre-push checks... - before node --check / npm run build',\n          \  '6. Pushed to branch, creating PR... - after git push',\n          \  '7. PR created: {url} - final comment with link',\n          \  '',\n  'NEVER go more than 5 minutes without a progress comment.',\n          \  'Post via curl to Supabase rest/v1/task_comments.',\n  '',\n  '## Pre-Push Checklist (NON-NEGOTIABLE)',\n  '- `node --check`\
           \ on every modified server-side .js file',\n  '- `cd client && npm run build`\
@@ -251,7 +251,7 @@ spec:
           \ task payload. Include PR URL in pull_request_url.',\n  '',\n  '## Rules',\n\
           \  '- NEVER edit source code directly \u2014 always use Codex/Claude Code',\n  '-\
           \ NEVER commit to main directly \u2014 always feature branch + PR',\n  '-\
-          \ NEVER push without passing quality gates',\n  '- If Codex fails twice,\
+          \ NEVER push without passing quality gates',\n  '- If sub-agent fails twice,\
           \ mark task as failed with explanation',\n  '- If the task requires DB migrations,\
           \ execute them via SUPABASE_MGMT_TOKEN',\n].join('\\n'));\n\n\n// --- Write\
           \ auth-profiles.json from env var (gitops-managed) ---\nconst authDir =\
