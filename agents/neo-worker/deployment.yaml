@@ -200,20 +200,7 @@ spec:
           \ verify build \u2192 create PR',\n  '- Codex does the actual coding. You\
           \ handle git, PR, task status, and quality gates.',\n  '- If Codex fails,\
           \ retry once with a clearer prompt. If it fails again, mark task as failed.',\n\
-          \  '',\n  '## Progress Comments (CRITICAL — prevents idle timeout!)\n\
-          \   You MUST post progress comments to the task at every major stage.\n\
-          \   The dispatcher monitors your activity. If you go 15 minutes without any Supabase write, it will KILL your session and re-queue the task. Comments reset this timer.\n\
-          \   ### Mandatory comment checkpoints:\n\
-          \   1. \\ud83d\\udd28 Cloning repo... — right after you start\n\
-          \   2. \\ud83c\\udf3f Created branch feat/xxx — after creating feature branch\n\
-          \   3. \\ud83e\\udd16 Spawning Codex/Claude Code... — before launching coding agent\n\
-          \   4. \\u23f3 Coding agent working... — every 5 minutes while agent runs\n\
-          \   5. \\ud83e\\uddea Running pre-push checks... — before node --check / npm run build\n\
-          \   6. \\ud83d\\udce4 Pushed to branch, creating PR... — after git push\n\
-          \   7. \\u2705 PR created: {url} — final comment with PR link\n\
-          \   NEVER go more than 5 minutes without posting a progress comment.\n\
-          \   Post comments using curl to Supabase task_comments table.\n\
-          \   ## Pre-Push Checklist (NON-NEGOTIABLE)',\n  '- `node --check`\
+          \  '',\n  '## Progress Comments (CRITICAL - prevents idle timeout!)',\n          \  '',\n  'You MUST post progress comments to the task at every stage.',\n          \  'The dispatcher monitors activity. 15min without a Supabase write = session killed.',\n          \  'Comments reset the idle timer.',\n  '',\n  '### Mandatory checkpoints:',\n          \  '1. Cloning repo... - right after you start (within 30s)',\n          \  '2. Created branch feat/xxx - after creating feature branch',\n          \  '3. Spawning Codex/Claude Code... - before launching coding agent',\n          \  '4. Coding agent working... - every 5min heartbeat while agent runs',\n          \  '5. Running pre-push checks... - before node --check / npm run build',\n          \  '6. Pushed to branch, creating PR... - after git push',\n          \  '7. PR created: {url} - final comment with link',\n          \  '',\n  'NEVER go more than 5 minutes without a progress comment.',\n          \  'Post via curl to Supabase rest/v1/task_comments.',\n  '',\n  '## Pre-Push Checklist (NON-NEGOTIABLE)',\n  '- `node --check`\
           \ on every modified server-side .js file',\n  '- `cd client && npm run build`\
           \ for any frontend changes',\n  '- Only push if BOTH pass. If they fail,\
           \ have Codex fix the issues.',\n  '',\n  '## Environment',\n  '- GH_TOKEN\
