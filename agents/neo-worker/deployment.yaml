@@ -59,7 +59,7 @@ spec:
           \ gateway: {\n    port: 18789,\n    mode: \"local\",\n    bind: \"lan\"\
           ,\n    auth: { mode: \"token\", token: e.OPENCLAW_GATEWAY_TOKEN || \"\"\
           \ },\n    http: { endpoints: { chatCompletions: { enabled: true } } },\n\
-          \    tools: { allow: [\"sessions_spawn\",\"sessions_send\",\"sessions_list\"\
+          \    tools: { allow: [\"Read\",\"Write\",\"Edit\",\"exec\",\"web_fetch\",\"web_search\",\"browser\",\"image\",\"sessions_spawn\",\"sessions_send\",\"sessions_list\"\
           ,\"sessions_history\",\"session_status\",\"cron\"] },\n    controlUi: {\
           \ dangerouslyAllowHostHeaderOriginFallback: true }\n  },\n  models: {\n\
           \    providers: {\n      anthropic: {\n        baseUrl: \"https://api.anthropic.com\"\
