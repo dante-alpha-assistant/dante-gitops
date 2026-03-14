@@ -86,7 +86,7 @@ spec:
           , reasoning: true, input: [\"text\"], cost: { input: 0, output: 0, cacheRead:\
           \ 0, cacheWrite: 0 }, contextWindow: 400000, maxTokens: 16384 }\n      \
           \  ]\n      }\n    }\n  },\n  agents: {\n    defaults: {\n      model: {\
-          \ primary: \"openrouter/anthropic/claude-sonnet-4-6\" },\n      workspace: \"/root/.openclaw/workspace\"\
+          \ primary: \"anthropic/claude-sonnet-4-6\" },\n      workspace: \"/root/.openclaw/workspace\"\
           ,\n      compaction: { mode: \"safeguard\" },\n      maxConcurrent: 4,\n      sandbox: { browser: { enabled: true, headless: true } },\n\
           \      subagents: { maxConcurrent: 8 },\n      heartbeat: { every: \"5m\"\
           \ }\n    }\n  },\n  hooks: { enabled: true, token: \"neo-worker-hooks-tok-2026\"\
