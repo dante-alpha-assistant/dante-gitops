@@ -22,314 +22,512 @@ spec:
         secret.reloader.stakater.com/reload: neo-worker-env
     spec:
       initContainers:
-      - name: init-tools
-        image: debian:bookworm-slim
-        command:
-        - /bin/bash
-        - -c
-        args:
-        - "set -e\napt-get update -qq && apt-get install -y -qq curl ca-certificates\
-          \ openssh-client > /dev/null 2>&1\nKUBE_VER=v1.31.0\ncurl -sL \"https://dl.k8s.io/release/${KUBE_VER}/bin/linux/amd64/kubectl\"\
-          \ -o /tools/kubectl\nchmod +x /tools/kubectl\necho \"kubectl ${KUBE_VER}\
-          \ installed\"\nSSH_DIR=/pvc/.ssh\nmkdir -p \"$SSH_DIR\"\nif [ ! -f \"$SSH_DIR/id_ed25519\"\
-          \ ]; then\n  ssh-keygen -t ed25519 -f \"$SSH_DIR/id_ed25519\" -N \"\" -q\n\
-          fi\nssh-keyscan github.com 167.235.61.168 >> \"$SSH_DIR/known_hosts\" 2>/dev/null\n\
-          sort -u \"$SSH_DIR/known_hosts\" -o \"$SSH_DIR/known_hosts\"\nchmod 700\
-          \ \"$SSH_DIR\"\nchmod 600 \"$SSH_DIR/id_ed25519\"\nchmod 644 \"$SSH_DIR/id_ed25519.pub\"\
-          \n[ -f \"$SSH_DIR/known_hosts\" ] && chmod 644 \"$SSH_DIR/known_hosts\"\n\
-          mkdir -p /ssh-out\ncp \"$SSH_DIR/id_ed25519\" /ssh-out/id_ed25519\ncp \"\
-          $SSH_DIR/id_ed25519.pub\" /ssh-out/id_ed25519.pub\n[ -f \"$SSH_DIR/known_hosts\"\
-          \ ] && cp \"$SSH_DIR/known_hosts\" /ssh-out/known_hosts\nchmod 600 /ssh-out/id_ed25519\n\
-          chmod 644 /ssh-out/id_ed25519.pub\n[ -f /ssh-out/known_hosts ] && chmod\
-          \ 644 /ssh-out/known_hosts\necho \"Tools + SSH ready\"\n"
-        volumeMounts:
-        - name: tools-bin
-          mountPath: /tools
-        - name: data
-          mountPath: /pvc
-        - name: ssh-out
-          mountPath: /ssh-out
-      - name: init-config
-        image: node:22-bookworm-slim
-        command:
-        - node
-        - -e
-        args:
-        - "const fs = require('fs');\nconst e = process.env;\nconst config = {\n \
-          \ gateway: {\n    port: 18789,\n    mode: \"local\",\n    bind: \"lan\"\
-          ,\n    auth: { mode: \"token\", token: e.OPENCLAW_GATEWAY_TOKEN || \"\"\
-          \ },\n    http: { endpoints: { chatCompletions: { enabled: true } } },\n\
-          \    tools: { allow: [\"Read\",\"Write\",\"Edit\",\"exec\",\"web_fetch\",\"web_search\",\"browser\",\"image\",\"sessions_spawn\",\"sessions_send\",\"sessions_list\"\
-          ,\"sessions_history\",\"session_status\",\"cron\"] },\n    controlUi: {\
-          \ dangerouslyAllowHostHeaderOriginFallback: true }\n  },\n  models: {\n\
-          \    providers: {\n      anthropic: {\n        baseUrl: \"https://api.anthropic.com\"\
-          ,\n        models: [\n          { id: \"claude-sonnet-4-6\", name: \"claude-sonnet-4-6\"\
-          , api: \"anthropic-messages\", reasoning: true, input: [\"text\",\"image\"\
-          ], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow:\
-          \ 200000, maxTokens: 16384 },\n          { id: \"claude-opus-4-6\", name:\
-          \ \"claude-opus-4-6\", api: \"anthropic-messages\", reasoning: true, input:\
-          \ [\"text\",\"image\"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite:\
-          \ 0 }, contextWindow: 200000, maxTokens: 16384 }\n        ]\n      },\n\
-          \      openrouter: {\n        baseUrl: \"https://openrouter.ai/api/v1\"\
-          ,\n        apiKey: e.OPENROUTER_API_KEY || \"\",\n        models: [\n  \
-          \        { id: \"anthropic/claude-sonnet-4-6\", name: \"claude-sonnet-4-6\"\
-          , api: \"openai-completions\", reasoning: false, input: [\"text\",\"image\"\
-          ], cost: { input: 3, output: 15, cacheRead: 0, cacheWrite: 0 }, contextWindow:\
-          \ 200000, maxTokens: 16384 },\n          { id: \"moonshotai/kimi-k2.5\"\
-          , name: \"kimi-k2.5\", api: \"openai-completions\", reasoning: true, input:\
-          \ [\"text\",\"image\"], cost: { input: 0.45, output: 2.25, cacheRead: 0.07,\
-          \ cacheWrite: 0 }, contextWindow: 262144, maxTokens: 8192 },\n        ]\n\
-          \      },\n      openai: {\n        baseUrl: \"https://api.openai.com/v1\"\
-          ,\n        apiKey: e.OPENAI_API_KEY || \"\",\n        auth: \"api-key\"\
-          ,\n        api: \"openai-responses\",\n        models: [\n          { id:\
-          \ \"gpt-5.2-codex\", name: \"gpt-5.2-codex\", api: \"openai-responses\"\
-          , reasoning: true, input: [\"text\"], cost: { input: 0, output: 0, cacheRead:\
-          \ 0, cacheWrite: 0 }, contextWindow: 400000, maxTokens: 16384 }\n      \
-          \  ]\n      }\n    }\n  },\n  agents: {\n    defaults: {\n      model: {\
-          \ primary: \"anthropic/claude-sonnet-4-6\" },\n      workspace: \"/root/.openclaw/workspace\"\
-          ,\n      compaction: { mode: \"safeguard\" },\n      maxConcurrent: 4,\n      sandbox: { browser: { enabled: true, headless: true } },\n\
-          \      subagents: { maxConcurrent: 8 },\n      heartbeat: { every: \"5m\"\
-          \ }\n    }\n  },\n  hooks: { enabled: true, token: \"neo-worker-hooks-tok-2026\"\
-          , allowRequestSessionKey: true, defaultSessionKey: \"hook:default\", allowedSessionKeyPrefixes:\
-          \ [\"hook:\"] },\n  tools: { sessions: { visibility: \"all\" } },\n  acp: { enabled: true, backend: \"acpx\", defaultAgent: \"codex\", allowedAgents: [\"codex\",\"claude\"], maxConcurrentSessions: 4, stream: { coalesceIdleMs: 300, maxChunkChars: 1200 }, runtime: { ttlMinutes: 60 } },\n  plugins: { entries: { acpx: { enabled: true, config: { permissionMode: \"approve-all\", nonInteractivePermissions: \"deny\" } } } }\n};\nfs.mkdirSync('/root/.openclaw/workspace',\
-          \ { recursive: true });\nfs.mkdirSync('/root/.openclaw/skills', { recursive:\
-          \ true });\nfs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config,\
-          \ null, 2));\n// HEARTBEAT.md \u2014 agent card self-update\nconst hbPath\
-          \ = '/root/.openclaw/workspace/HEARTBEAT.md';\nconst agentId = 'neo-worker';\n\
-          const sbUrl = 'https://lessxkxujvcmublgwdaa.supabase.co';\nconst sbKey =\
-          \ 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI';\n\
-          const heartbeat = [\n  '# HEARTBEAT.md \u2014 Agent Card Self-Update + Model\
-          \ Health Check',\n  '',\n  'Run these steps IN ORDER every heartbeat. Do\
-          \ NOT modify any commands.',\n  '',\n  '## Step 1: Check current status',\n\
-          \  '',\n  '```bash',\n  `STATUS=$(curl -s \"${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}&select=status\"\
-          \ \\\\`,\n  `  -H \"apikey: ${sbKey}\" \\\\`,\n  `  -H \"Authorization:\
-          \ Bearer ${sbKey}\" | grep -o '\"status\":\"[^\"]*\"' | cut -d'\"' -f4)`,\n\
-          \  'echo \"Current status: $STATUS\"',\n  '```',\n  '',\n  'If status is\
-          \ \"disabled\", skip everything and reply HEARTBEAT_OK.',\n  '',\n  '##\
-          \ Step 2: Model health verified',\n  '',\n  'If you are reading and executing\
-          \ this, your model API is healthy.',\n  '(A broken model would cause this\
-          \ heartbeat session to fail before reaching here.)',\n  '',\n  '## Step\
-          \ 3: Update agent card \u2014 online + model_health ok',\n  '',\n  '```bash',\n\
-          \  `curl -s -X PATCH \"${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}\" \\\
-          \\`,\n  `  -H \"apikey: ${sbKey}\" \\\\`,\n  `  -H \"Authorization: Bearer\
-          \ ${sbKey}\" \\\\`,\n  '  -H \"Content-Type: application/json\" \\\\',\n\
-          \  `  -d '{\"status\":\"online\",\"last_heartbeat\":\"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"\
-          ,\"metadata\":{\"model_health\":\"ok\",\"model_health_at\":\"'$(date -u\
-          \ +%Y-%m-%dT%H:%M:%SZ)'\"}}'`,\n  '```',\n  '',\n  'If the curl succeeds,\
-          \ reply HEARTBEAT_OK.',\n].join('\\\\n');\n// Only write if not already\
-          \ customized by the agent\nif (!fs.existsSync(hbPath) || fs.readFileSync(hbPath,\
-          \ 'utf8').includes('Keep this file empty')) {\n  fs.writeFileSync(hbPath,\
-          \ heartbeat);\n}\n// Seed heartbeat cron job\nconst cronDir = '/root/.openclaw/cron';\n\
-          const cronPath = cronDir + '/jobs.json';\nfs.mkdirSync(cronDir, { recursive:\
-          \ true });\nif (!fs.existsSync(cronPath)) {\n  const cronJobs = {\n    version:\
-          \ 1,\n    jobs: [{\n      id: 'heartbeat-agent-card',\n      name: 'heartbeat-agent-card',\n\
-          \      enabled: true,\n      createdAtMs: Date.now(),\n      updatedAtMs:\
-          \ Date.now(),\n      schedule: { kind: 'every', everyMs: 300000, anchorMs:\
-          \ Date.now() },\n      sessionTarget: 'isolated',\n      wakeMode: 'now',\n\
-          \      payload: { kind: 'agentTurn', message: 'Run the heartbeat: update\
-          \ your agent card. Read HEARTBEAT.MD and follow it.', timeoutSeconds: 30\
-          \ },\n      delivery: { mode: 'none', channel: 'last' },\n      state: {\
-          \ nextRunAtMs: Date.now() + 300000 }\n    }]\n  };\n  fs.writeFileSync(cronPath,\
-          \ JSON.stringify(cronJobs, null, 2));\n}\n// --- task-worker skill ---\n\
-          const skillDir = '/root/.openclaw/workspace/skills/task-worker';\nfs.mkdirSync(skillDir,\
-          \ { recursive: true });\nfs.writeFileSync(skillDir + '/SKILL.md', [\n  '#\
-          \ task-worker \u2014 Dispatched Task Execution Skill',\n  '',\n  '## When\
-          \ to Use',\n  'This skill applies to EVERY message from \"Task Dispatcher\"\
-          \ that contains a JSON task payload.',\n  'If you see `## Task Assigned:`\
-          \ in the message, follow this skill.',\n  '',\n  '## Workspace Repos (NEVER\
-          \ clone fresh!)',\n  'Your repos are already cloned in your workspace:',\n\
-          \  '- `queue-dashboard/` \u2014 Dashboard frontend + Express backend (tasks.dante.id)',\n\
-          \  '- `task-dispatcher/` \u2014 Task dispatcher service',\n  '- `dante-gitops/`\
-          \ \u2014 Kubernetes manifests + ArgoCD configs',\n  '',\n  '**ALWAYS work\
-          \ in these existing directories.** Do NOT `git clone` to `/tmp/` or anywhere\
-          \ else.',\n  '',\n  '## Git Workflow',\n  '1. `cd <repo>` (e.g., `cd queue-dashboard`)',\n\
-          \  '2. `git fetch origin && git checkout main && git pull origin main`',\n\
-          \  '3. `git checkout -b task/<task-id-first-8-chars>` (e.g., `task/4cc804fa`)',\n\
-          \  '4. Make your changes',\n  '5. `git add -A && git commit -m \"<type>:\
-          \ <description> [task:<id>]\"`',\n  '6. `git push origin HEAD`',\n  '7.\
-          \ Create PR: `gh pr create --title \"<title>\" --body \"Task: <id>\\\\n\\\
-          \\n<description>\" --base main`',\n  '',\n  '## GitHub Auth',\n  '- `gh`\
-          \ CLI is available. Auth via `GH_TOKEN` env var (already set).',\n  '- If\
-          \ `gh` auth fails, use: `git remote set-url origin https://${GH_TOKEN}@github.com/dante-alpha-assistant/<repo>.git`',\n\
-          \  '',\n  '## Build & Test',\n  '- Dashboard: `cd queue-dashboard && npm\
-          \ install && npm run build` (Vite frontend in `client/`)',\n  '- Dispatcher:\
-          \ `cd task-dispatcher && npm install && node index.js` (test startup only)',\n\
-          \  '- Always run `npm install` if you change `package.json`',\n  '- Always\
-          \ test your changes compile/build before committing',\n  '',\n  '## Docker\
-          \ Build (for deployment)',\n  '- Dashboard has a `Dockerfile` \u2014 after\
-          \ pushing PR, the GitHub Actions workflow builds + pushes to GHCR',\n  '-\
-          \ ArgoCD Image Updater auto-deploys new images',\n  '',\n  '## Status Updates',\n\
-          \  'The dispatch message includes curl commands for status updates. ALWAYS\
-          \ run them when done.',\n  'Include a meaningful summary in the `result.summary`\
-          \ field \u2014 what files changed, what the fix does.',\n  '',\n  '## Common\
-          \ Mistakes to Avoid',\n  '- \u274C `git clone` to `/tmp/` \u2014 repos are\
-          \ already in workspace',\n  '- \u274C Editing files that do not exist \u2014\
-          \ always verify the file path with `ls` or `find` first',\n  '- \u274C Forgetting\
-          \ to `git pull` \u2014 always pull latest before branching',\n  '- \u274C\
-          \ Not testing \u2014 always `npm run build` or equivalent before committing',\n\
-          \  '- \u274C Generic commit messages \u2014 include the task ID and what\
-          \ changed',\n  '- \u274C Leaving task in_progress \u2014 ALWAYS update to\
-          \ done or failed',\n].join('\\n'));\n// Write TOOLS.md with repo locations\
-          \ (always overwrite \u2014 this is infra truth)\nfs.writeFileSync('/root/.openclaw/workspace/TOOLS.md',\
-          \ [\n  '# TOOLS.md \u2014 neo-worker',\n  '',\n  '## Workspace Repos',\n\
-          \  '- `queue-dashboard/` \u2014 Dashboard frontend + Express backend (tasks.dante.id)',\n\
-          \  '- `task-dispatcher/` \u2014 Task dispatcher service',  \n  '- `dante-gitops/`\
-          \ \u2014 Kubernetes manifests + ArgoCD configs',\n  '',\n  '## Skills',\n\
-          \  '- **task-worker**: Read `skills/task-worker/SKILL.md` when handling\
-          \ dispatched tasks',\n  '',\n  '## Git',\n  '- GitHub org: dante-alpha-assistant',\n\
-          \  '- Auth: GH_TOKEN env var (use with gh CLI or git remote URL)',\n  '-\
-          \ NEVER clone repos to /tmp/ \u2014 they are in your workspace already',\n\
-          \  '',\n  '## K8s',\n  '- kubectl available at /tools/kubectl',\n  '- Cluster:\
-          \ k3s on 167.235.61.168',\n  '- Namespaces: agents, dev, infra, dante',\n\
-          ].join('\\n'));\n// SOUL.md for neo-worker\nconst soulPath = '/root/.openclaw/workspace/SOUL.md';\n\
-          fs.writeFileSync(soulPath, [\n  '# SOUL.md - neo-worker',\n  '',\n  'You\
-          \ are **neo-worker**, a headless engineering agent. You receive tasks from\
-          \ the dispatcher and execute them.',\n  '',\n  '## Core Rules',\n  '- You\
-          \ are an headless coding agent. You DELEGATE coding to Codex/Claude Code, you do NOT\
-          \ write code yourself.',\n  '- ALWAYS use the coding-task skill when you\
-          \ receive a dispatched task.',\n  '- NEVER edit source code files directly.\
-          \ ALWAYS spawn sub-agents (sessions_spawn, mode: run) to do the coding.',\n  '- NEVER try to edit files\
-          \ without cloning the repo first.',\n  '- ALWAYS create a feature branch,\
-          \ never commit to main directly.',\n  '- ALWAYS create a PR with a clear\
-          \ title and description.',\n  '- ALWAYS update task status when done (done\
-          \ on success, failed on error).',\n  '- ALWAYS run pre-push checks: `node\
-          \ --check` on modified JS files + `npm run build` for frontend.',\n  '',\n\
-          \  '## Coding via Sub-Agent Delegation (MANDATORY) \u2014 Your Coding Tools',\n  '- For ALL coding work, spawn\
-          \ Codex: `codex --full-auto exec \"prompt\"`',\n  '- You\
-          \ orchestrate: clone repo \u2192 create branch \u2192 spawn sub-agent \u2192\
-          \ verify build \u2192 create PR',\n  '- Codex does the actual coding. You\
-          \ handle git, PR, task status, and quality gates.',\n  '- If sub-agent fails,\
-          \ retry once with a clearer prompt. If it fails again, mark task as failed.',\n\
-          \  '',\n  '## Progress Comments (CRITICAL - prevents idle timeout!)',\n          \  '',\n  'You MUST post progress comments to the task at every stage.',\n          \  'The dispatcher monitors activity. 15min without a Supabase write = session killed.',\n          \  'Comments reset the idle timer.',\n  '',\n  '### Mandatory checkpoints:',\n          \  '1. Cloning repo... - right after you start (within 30s)',\n          \  '2. Created branch feat/xxx - after creating feature branch',\n          \  '3. Spawning Codex/Claude Code... - before launching coding agent',\n          \  '4. Coding agent working... - every 5min heartbeat while agent runs',\n          \  '5. Running pre-push checks... - before node --check / npm run build',\n          \  '6. Pushed to branch, creating PR... - after git push',\n          \  '7. PR created: {url} - final comment with link',\n          \  '',\n  'NEVER go more than 5 minutes without a progress comment.',\n          \  'Post via curl to Supabase rest/v1/task_comments.',\n  '',\n  '## Pre-Push Checklist (NON-NEGOTIABLE)',\n  '- `node --check`\
-          \ on every modified server-side .js file',\n  '- `cd client && npm run build`\
-          \ for any frontend changes',\n  '- Only push if BOTH pass. If they fail,\
-          \ have Codex fix the issues.',\n  '',\n  '## Environment',\n  '- GH_TOKEN\
-          \ is available as an env var for git operations',\n  '- OPENAI_API_KEY is\
-          \ available for Codex/Claude Code',\n  '- Git user: Neo <dante-neo-assistant@proton.me>',\n\
-          \  '- Workspace: /root/.openclaw/workspace/',\n].join('\\n'));\n\n// AGENTS.md\n\
-          const agentsPath = '/root/.openclaw/workspace/AGENTS.md';\nfs.writeFileSync(agentsPath,\
-          \ [\n  '# AGENTS.md - neo-worker',\n  '',\n  '## Every Session',\n  '1.\
-          \ Read SOUL.md',\n  '2. When receiving a task, follow the coding-task skill',\n\
-          \  '',\n  '## Git Setup',\n  'Run before any git operations:',\n  'git config\
-          \ --global user.email \"dante-neo-assistant@proton.me\"',\n  'git config\
-          \ --global user.name \"Neo\"',\n  '',\n  '## Repos',\n  '- queue-dashboard:\
-          \ https://github.com/dante-alpha-assistant/queue-dashboard',\n  '- task-dispatcher:\
-          \ https://github.com/dante-alpha-assistant/task-dispatcher',\n  '- dante-gitops:\
-          \ https://github.com/dante-alpha-assistant/dante-gitops',\n].join('\\n'));\n\
-          \n// coding-task skill\nconst codingSkillDir = '/root/.openclaw/workspace/skills/coding-task';\n\
-          fs.mkdirSync(codingSkillDir, { recursive: true });\nfs.writeFileSync(codingSkillDir\
-          \ + '/SKILL.md', [\n  '# coding-task Skill',\n  '',\n  'Use this skill when\
-          \ you receive a task from the dispatcher.',\n  '',\n  '## Steps',\n  '',\n\
-          \  '### 1. Parse the task',\n  '- Extract task_id, title, description, repo\
-          \ from the JSON payload',\n  '',\n  '### 2. Setup git',\n  '```bash',\n\
-          \  'git config --global user.email \"dante-neo-assistant@proton.me\"',\n\
-          \  'git config --global user.name \"Neo\"',\n  '```',\n  '',\n  '### 3.\
-          \ Clone the repo + create branch',\n  '```bash',\n  'WORK_DIR=$(mktemp -d)',\n\
-          \  'git clone https://x-access-token:${GH_TOKEN}@github.com/{owner}/{repo}.git\
-          \ $WORK_DIR',\n  'cd $WORK_DIR',\n  'git checkout -b feat/{short-task-description}',\n\
-          \  '```',\n  '',\n  '### 4. Spawn Codex/Claude Code to do the coding',\n  '**MANDATORY:\
-          \ ALL coding MUST be done by Codex/Claude Code. Do NOT write code yourself.**',\n\
-          \  '',\n  'Build a detailed prompt for Codex that includes:',\n  '- The\
-          \ task title and full description',\n  '- Any relevant context from the\
-          \ task payload',\n  '- Specific files to modify if known',\n  '- The acceptance\
-          \ criteria',\n  '',\n  '```bash',\n  'cd $WORK_DIR',\n  'codex exec --model\
-          \ codex-5.3 --full-auto \"Your detailed prompt here\"',\n  '```',\n  '',\n\
-          \  '### 5. Pre-push quality gates (NON-NEGOTIABLE)',\n  'After Codex finishes,\
-          \ verify the work:',\n  '',\n  '```bash',\n  '# For Node.js projects:',\n\
-          \  'for f in $(git diff --name-only HEAD~1 | grep \"\\\\.js$\"); do node\
-          \ --check \"$f\"; done',\n  '',\n  '# For frontend projects with a client/\
-          \ dir:',\n  'if [ -d client ]; then cd client && npm install && npm run\
-          \ build; cd ..; fi',\n  '',\n  '# For backend-only:',\n  'npm install &&\
-          \ npm test 2>/dev/null || true',\n  '```',\n  '',\n  'If checks fail, spawn\
-          \ Codex again to fix: `codex --full-auto exec \"Fix build\
-          \ errors: {paste errors}\"`',\n  '',\n  '### 6. Commit and push',\n  '```bash',\n\
-          \  'git add -A',\n  'git commit -m \"{type}: {description} [task:{task_id}]\"\
-          ',\n  'git push -u origin feat/{short-task-description}',\n  '```',\n  '',\n\
-          \  '### 7. Create PR',\n  '```bash',\n  'gh pr create --title \"{task title}\"\
-          \ --body \"Task: {task_id}\\\\n\\\\n{description}\" --base main',\n  '```',\n\
-          \  '',\n  '### 8. Update task status',\n  'Use the curl command from the\
-          \ task payload. Include PR URL in pull_request_url.',\n  '',\n  '## Rules',\n\
-          \  '- NEVER edit source code directly \u2014 always use Codex/Claude Code',\n  '-\
-          \ NEVER commit to main directly \u2014 always feature branch + PR',\n  '-\
-          \ NEVER push without passing quality gates',\n  '- If sub-agent fails twice,\
-          \ mark task as failed with explanation',\n  '- If the task requires DB migrations,\
-          \ execute them via SUPABASE_MGMT_TOKEN',\n].join('\\n'));\n\n\n// --- Write\
-          \ auth-profiles.json from env var (gitops-managed) ---\nconst authDir =\
-          \ '/root/.openclaw/agents/main/agent';\nconst authPath = authDir + '/auth-profiles.json';\n\
-          fs.mkdirSync(authDir, { recursive: true });\nconst apiKey = e.ANTHROPIC_API_KEY\
-          \ || process.env.ANTHROPIC_API_KEY || '';\nif (apiKey) {\n  let existing\
-          \ = {};\n  try { existing = JSON.parse(fs.readFileSync(authPath, 'utf8'));\
-          \ } catch(_) {}\n  existing.version = 1;\n  existing.profiles = existing.profiles\
-          \ || {};\n  const isOAuth = apiKey.startsWith('sk-ant-oat01-');\n  existing.profiles['anthropic:default']\
-          \ = isOAuth\n    ? { type: 'oauth', provider: 'anthropic', access: apiKey\
-          \ }\n    : { type: 'api_key', provider: 'anthropic', key: apiKey };\n  existing.lastGood\
-          \ = existing.lastGood || {};\n  existing.lastGood.anthropic = 'anthropic:default';\n\
-          \  fs.writeFileSync(authPath, JSON.stringify(existing, null, 2));\n  console.log('auth-profiles.json\
-          \ written from ANTHROPIC_API_KEY');\n}\nconsole.log('Config + HEARTBEAT.md\
-          \ + SOUL.md + coding-task skill written OK');\n"
-        envFrom:
-        - secretRef:
-            name: neo-worker-env
-        volumeMounts:
-        - name: data
-          mountPath: /root/.openclaw
+        - name: init-tools
+          image: debian:bookworm-slim
+          command:
+            - /bin/bash
+            - '-c'
+          args:
+            - |
+              set -e
+              apt-get update -qq && apt-get install -y -qq curl ca-certificates openssh-client > /dev/null 2>&1
+              KUBE_VER=v1.31.0
+              curl -sL "https://dl.k8s.io/release/${KUBE_VER}/bin/linux/amd64/kubectl" -o /tools/kubectl
+              chmod +x /tools/kubectl
+              echo "kubectl ${KUBE_VER} installed"
+              SSH_DIR=/pvc/.ssh
+              mkdir -p "$SSH_DIR"
+              if [ ! -f "$SSH_DIR/id_ed25519" ]; then
+                ssh-keygen -t ed25519 -f "$SSH_DIR/id_ed25519" -N "" -q
+              fi
+              ssh-keyscan github.com 167.235.61.168 >> "$SSH_DIR/known_hosts" 2>/dev/null
+              sort -u "$SSH_DIR/known_hosts" -o "$SSH_DIR/known_hosts"
+              chmod 700 "$SSH_DIR"
+              chmod 600 "$SSH_DIR/id_ed25519"
+              chmod 644 "$SSH_DIR/id_ed25519.pub"
+              [ -f "$SSH_DIR/known_hosts" ] && chmod 644 "$SSH_DIR/known_hosts"
+              mkdir -p /ssh-out
+              cp "$SSH_DIR/id_ed25519" /ssh-out/id_ed25519
+              cp "$SSH_DIR/id_ed25519.pub" /ssh-out/id_ed25519.pub
+              [ -f "$SSH_DIR/known_hosts" ] && cp "$SSH_DIR/known_hosts" /ssh-out/known_hosts
+              chmod 600 /ssh-out/id_ed25519
+              chmod 644 /ssh-out/id_ed25519.pub
+              [ -f /ssh-out/known_hosts ] && chmod 644 /ssh-out/known_hosts
+              echo "Tools + SSH ready"
+          volumeMounts:
+            - name: tools-bin
+              mountPath: /tools
+            - name: data
+              mountPath: /pvc
+            - name: ssh-out
+              mountPath: /ssh-out
+        - name: init-config
+          image: node:22-bookworm-slim
+          command:
+            - node
+            - '-e'
+          args:
+            - |
+              const fs = require('fs');
+              const e = process.env;
+              const config = {
+                gateway: {
+                  port: 18789,
+                  mode: "local",
+                  bind: "lan",
+                  auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "" },
+                  http: { endpoints: { chatCompletions: { enabled: true } } },
+                  tools: { allow: ["Read","Write","Edit","exec","web_fetch","web_search","browser","image","sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] },
+                  controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
+                },
+                models: {
+                  providers: {
+                    anthropic: {
+                      baseUrl: "https://api.anthropic.com",
+                      models: [
+                        { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6", api: "anthropic-messages", reasoning: true, input: ["text","image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 },
+                        { id: "claude-opus-4-6", name: "claude-opus-4-6", api: "anthropic-messages", reasoning: true, input: ["text","image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 }
+                      ]
+                    },
+                    openrouter: {
+                      baseUrl: "https://openrouter.ai/api/v1",
+                      apiKey: e.OPENROUTER_API_KEY || "",
+                      models: [
+                        { id: "anthropic/claude-sonnet-4-6", name: "claude-sonnet-4-6", api: "openai-completions", reasoning: false, input: ["text","image"], cost: { input: 3, output: 15, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 },
+                        { id: "moonshotai/kimi-k2.5", name: "kimi-k2.5", api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 0.45, output: 2.25, cacheRead: 0.07, cacheWrite: 0 }, contextWindow: 262144, maxTokens: 8192 },
+                      ]
+                    },
+                    openai: {
+                      baseUrl: "https://api.openai.com/v1",
+                      apiKey: e.OPENAI_API_KEY || "",
+                      auth: "api-key",
+                      api: "openai-responses",
+                      models: [
+                        { id: "gpt-5.2-codex", name: "gpt-5.2-codex", api: "openai-responses", reasoning: true, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 400000, maxTokens: 16384 }
+                      ]
+                    }
+                  }
+                },
+                agents: {
+                  defaults: {
+                    model: { primary: "anthropic/claude-sonnet-4-6" },
+                    workspace: "/root/.openclaw/workspace",
+                    compaction: { mode: "safeguard" },
+                    maxConcurrent: 4,
+                    sandbox: { browser: { enabled: true, headless: true } },
+                    subagents: { maxConcurrent: 8 },
+                    heartbeat: { every: "5m" }
+                  }
+                },
+                hooks: { enabled: true, token: "neo-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
+                tools: { sessions: { visibility: "all" } },
+                acp: { enabled: true, backend: "acpx", defaultAgent: "codex", allowedAgents: ["codex","claude"], maxConcurrentSessions: 4, stream: { coalesceIdleMs: 300, maxChunkChars: 1200 }, runtime: { ttlMinutes: 60 } },
+                plugins: { entries: { acpx: { enabled: true, config: { permissionMode: "approve-all", nonInteractivePermissions: "deny" } } } }
+              };
+              fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
+              fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
+              fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
+              // HEARTBEAT.md — agent card self-update
+              const hbPath = '/root/.openclaw/workspace/HEARTBEAT.md';
+              const agentId = 'neo-worker';
+              const sbUrl = 'https://lessxkxujvcmublgwdaa.supabase.co';
+              const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI';
+              const heartbeat = [
+                '# HEARTBEAT.md — Agent Card Self-Update + Model Health Check',
+                '',
+                'Run these steps IN ORDER every heartbeat. Do NOT modify any commands.',
+                '',
+                '## Step 1: Check current status',
+                '',
+                '```bash',
+                `STATUS=$(curl -s "${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}&select=status" \\`,
+                `  -H "apikey: ${sbKey}" \\`,
+                `  -H "Authorization: Bearer ${sbKey}" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)`,
+                'echo "Current status: $STATUS"',
+                '```',
+                '',
+                'If status is "disabled", skip everything and reply HEARTBEAT_OK.',
+                '',
+                '## Step 2: Model health verified',
+                '',
+                'If you are reading and executing this, your model API is healthy.',
+                '(A broken model would cause this heartbeat session to fail before reaching here.)',
+                '',
+                '## Step 3: Update agent card — online + model_health ok',
+                '',
+                '```bash',
+                `curl -s -X PATCH "${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}" \\`,
+                `  -H "apikey: ${sbKey}" \\`,
+                `  -H "Authorization: Bearer ${sbKey}" \\`,
+                '  -H "Content-Type: application/json" \\',
+                `  -d '{"status":"online","last_heartbeat":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","metadata":{"model_health":"ok","model_health_at":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}}'`,
+                '```',
+                '',
+                'If the curl succeeds, reply HEARTBEAT_OK.',
+              ].join('\\n');
+              // Only write if not already customized by the agent
+              if (!fs.existsSync(hbPath) || fs.readFileSync(hbPath, 'utf8').includes('Keep this file empty')) {
+                fs.writeFileSync(hbPath, heartbeat);
+              }
+              // Seed heartbeat cron job
+              const cronDir = '/root/.openclaw/cron';
+              const cronPath = cronDir + '/jobs.json';
+              fs.mkdirSync(cronDir, { recursive: true });
+              if (!fs.existsSync(cronPath)) {
+                const cronJobs = {
+                  version: 1,
+                  jobs: [{
+                    id: 'heartbeat-agent-card',
+                    name: 'heartbeat-agent-card',
+                    enabled: true,
+                    createdAtMs: Date.now(),
+                    updatedAtMs: Date.now(),
+                    schedule: { kind: 'every', everyMs: 300000, anchorMs: Date.now() },
+                    sessionTarget: 'isolated',
+                    wakeMode: 'now',
+                    payload: { kind: 'agentTurn', message: 'Run the heartbeat: update your agent card. Read HEARTBEAT.MD and follow it.', timeoutSeconds: 30 },
+                    delivery: { mode: 'none', channel: 'last' },
+                    state: { nextRunAtMs: Date.now() + 300000 }
+                  }]
+                };
+                fs.writeFileSync(cronPath, JSON.stringify(cronJobs, null, 2));
+              }
+              // --- task-worker skill ---
+              const skillDir = '/root/.openclaw/workspace/skills/task-worker';
+              fs.mkdirSync(skillDir, { recursive: true });
+              fs.writeFileSync(skillDir + '/SKILL.md', [
+                '# task-worker — Dispatched Task Execution Skill',
+                '',
+                '## When to Use',
+                'This skill applies to EVERY message from "Task Dispatcher" that contains a JSON task payload.',
+                'If you see `## Task Assigned:` in the message, follow this skill.',
+                '',
+                '## Workspace Repos (NEVER clone fresh!)',
+                'Your repos are already cloned in your workspace:',
+                '- `queue-dashboard/` — Dashboard frontend + Express backend (tasks.dante.id)',
+                '- `task-dispatcher/` — Task dispatcher service',
+                '- `dante-gitops/` — Kubernetes manifests + ArgoCD configs',
+                '',
+                '**ALWAYS work in these existing directories.** Do NOT `git clone` to `/tmp/` or anywhere else.',
+                '',
+                '## Git Workflow',
+                '1. `cd <repo>` (e.g., `cd queue-dashboard`)',
+                '2. `git fetch origin && git checkout main && git pull origin main`',
+                '3. `git checkout -b task/<task-id-first-8-chars>` (e.g., `task/4cc804fa`)',
+                '4. Make your changes',
+                '5. `git add -A && git commit -m "<type>: <description> [task:<id>]"`',
+                '6. `git push origin HEAD`',
+                '7. Create PR: `gh pr create --title "<title>" --body "Task: <id>\\n\\n<description>" --base main`',
+                '',
+                '## GitHub Auth',
+                '- `gh` CLI is available. Auth via `GH_TOKEN` env var (already set).',
+                '- If `gh` auth fails, use: `git remote set-url origin https://${GH_TOKEN}@github.com/dante-alpha-assistant/<repo>.git`',
+                '',
+                '## Build & Test',
+                '- Dashboard: `cd queue-dashboard && npm install && npm run build` (Vite frontend in `client/`)',
+                '- Dispatcher: `cd task-dispatcher && npm install && node index.js` (test startup only)',
+                '- Always run `npm install` if you change `package.json`',
+                '- Always test your changes compile/build before committing',
+                '',
+                '## Docker Build (for deployment)',
+                '- Dashboard has a `Dockerfile` — after pushing PR, the GitHub Actions workflow builds + pushes to GHCR',
+                '- ArgoCD Image Updater auto-deploys new images',
+                '',
+                '## Status Updates',
+                'The dispatch message includes curl commands for status updates. ALWAYS run them when done.',
+                'Include a meaningful summary in the `result.summary` field — what files changed, what the fix does.',
+                '',
+                '## Common Mistakes to Avoid',
+                '- ❌ `git clone` to `/tmp/` — repos are already in workspace',
+                '- ❌ Editing files that do not exist — always verify the file path with `ls` or `find` first',
+                '- ❌ Forgetting to `git pull` — always pull latest before branching',
+                '- ❌ Not testing — always `npm run build` or equivalent before committing',
+                '- ❌ Generic commit messages — include the task ID and what changed',
+                '- ❌ Leaving task in_progress — ALWAYS update to done or failed',
+              ].join('\n'));
+              // Write TOOLS.md with repo locations (always overwrite — this is infra truth)
+              fs.writeFileSync('/root/.openclaw/workspace/TOOLS.md', [
+                '# TOOLS.md — neo-worker',
+                '',
+                '## Workspace Repos',
+                '- `queue-dashboard/` — Dashboard frontend + Express backend (tasks.dante.id)',
+                '- `task-dispatcher/` — Task dispatcher service',  
+                '- `dante-gitops/` — Kubernetes manifests + ArgoCD configs',
+                '',
+                '## Skills',
+                '- **task-worker**: Read `skills/task-worker/SKILL.md` when handling dispatched tasks',
+                '',
+                '## Git',
+                '- GitHub org: dante-alpha-assistant',
+                '- Auth: GH_TOKEN env var (use with gh CLI or git remote URL)',
+                '- NEVER clone repos to /tmp/ — they are in your workspace already',
+                '',
+                '## K8s',
+                '- kubectl available at /tools/kubectl',
+                '- Cluster: k3s on 167.235.61.168',
+                '- Namespaces: agents, dev, infra, dante',
+              ].join('\n'));
+              // SOUL.md for neo-worker
+              const soulPath = '/root/.openclaw/workspace/SOUL.md';
+              fs.writeFileSync(soulPath, [
+                '# SOUL.md - neo-worker',
+                '',
+                'You are **neo-worker**, a headless engineering agent. You receive tasks from the dispatcher and execute them.',
+                '',
+                '## Core Rules',
+                '- You are an headless coding agent. You DELEGATE coding to Codex/Claude Code, you do NOT write code yourself.',
+                '- ALWAYS use the coding-task skill when you receive a dispatched task.',
+                '- NEVER edit source code files directly. ALWAYS spawn sub-agents (sessions_spawn, mode: run) to do the coding.',
+                '- NEVER try to edit files without cloning the repo first.',
+                '- ALWAYS create a feature branch, never commit to main directly.',
+                '- ALWAYS create a PR with a clear title and description.',
+                '- ALWAYS update task status when done (done on success, failed on error).',
+                '- ALWAYS run pre-push checks: `node --check` on modified JS files + `npm run build` for frontend.',
+                '',
+                '## Coding via Sub-Agent Delegation (MANDATORY) — Your Coding Tools',
+                '- For ALL coding work, spawn Codex: `codex --full-auto exec "prompt"`',
+                '- You orchestrate: clone repo → create branch → spawn sub-agent → verify build → create PR',
+                '- Codex does the actual coding. You handle git, PR, task status, and quality gates.',
+                '- If sub-agent fails, retry once with a clearer prompt. If it fails again, mark task as failed.',
+                '',
+                '## Progress Comments (CRITICAL - prevents idle timeout!)',
+                          '',
+                'You MUST post progress comments to the task at every stage.',
+                          'The dispatcher monitors activity. 15min without a Supabase write = session killed.',
+                          'Comments reset the idle timer.',
+                '',
+                '### Mandatory checkpoints:',
+                          '1. Cloning repo... - right after you start (within 30s)',
+                          '2. Created branch feat/xxx - after creating feature branch',
+                          '3. Spawning Codex/Claude Code... - before launching coding agent',
+                          '4. Coding agent working... - every 5min heartbeat while agent runs',
+                          '5. Running pre-push checks... - before node --check / npm run build',
+                          '6. Pushed to branch, creating PR... - after git push',
+                          '7. PR created: {url} - final comment with link',
+                          '',
+                'NEVER go more than 5 minutes without a progress comment.',
+                          'Post via curl to Supabase rest/v1/task_comments.',
+                '',
+                '## Pre-Push Checklist (NON-NEGOTIABLE)',
+                '- `node --check` on every modified server-side .js file',
+                '- `cd client && npm run build` for any frontend changes',
+                '- Only push if BOTH pass. If they fail, have Codex fix the issues.',
+                '',
+                '## Research Deliverable Upload (when handling research tasks)',
+                '',
+                'If a research task produces an MD file at workspace/research/{slug}.md, upload it as a task attachment:',
+                '',
+                '1. Upload via the dashboard API:',
+                '```bash',
+                'TASK_ID="the-task-id"',
+                'SLUG="slug-name"',
+                'FILE_PATH="/root/.openclaw/workspace/research/${SLUG}.md"',
+                'curl -s -X POST "https://tasks.dante.id/api/tasks/${TASK_ID}/attachments" \\',
+                '  -H "Content-Type: application/json" \\',
+                '  --data-binary @"${FILE_PATH}"',
+                '```',
+                '',
+                'Or use direct Supabase Storage upload:',
+                '```bash',
+                'SUPABASE_KEY="${SUPABASE_SERVICE_ROLE_KEY}"',
+                'curl -s -X POST "https://lessxkxujvcmublgwdaa.supabase.co/storage/v1/object/task-attachments/${TASK_ID}/${SLUG}.md" \\',
+                '  -H "apikey: ${SUPABASE_KEY}" \\',
+                '  -H "Authorization: Bearer ${SUPABASE_KEY}" \\',
+                '  -H "Content-Type: text/markdown" \\',
+                '  --data-binary @"${FILE_PATH}"',
+                '```',
+                '',
+                '## Environment',
+                '- GH_TOKEN is available as an env var for git operations',
+                '- OPENAI_API_KEY is available for Codex/Claude Code',
+                '- Git user: Neo <dante-neo-assistant@proton.me>',
+                '- Workspace: /root/.openclaw/workspace/',
+              ].join('\n'));
+
+              // AGENTS.md
+              const agentsPath = '/root/.openclaw/workspace/AGENTS.md';
+              fs.writeFileSync(agentsPath, [
+                '# AGENTS.md - neo-worker',
+                '',
+                '## Every Session',
+                '1. Read SOUL.md',
+                '2. When receiving a task, follow the coding-task skill',
+                '',
+                '## Git Setup',
+                'Run before any git operations:',
+                'git config --global user.email "dante-neo-assistant@proton.me"',
+                'git config --global user.name "Neo"',
+                '',
+                '## Repos',
+                '- queue-dashboard: https://github.com/dante-alpha-assistant/queue-dashboard',
+                '- task-dispatcher: https://github.com/dante-alpha-assistant/task-dispatcher',
+                '- dante-gitops: https://github.com/dante-alpha-assistant/dante-gitops',
+              ].join('\n'));
+
+              // coding-task skill
+              const codingSkillDir = '/root/.openclaw/workspace/skills/coding-task';
+              fs.mkdirSync(codingSkillDir, { recursive: true });
+              fs.writeFileSync(codingSkillDir + '/SKILL.md', [
+                '# coding-task Skill',
+                '',
+                'Use this skill when you receive a task from the dispatcher.',
+                '',
+                '## Steps',
+                '',
+                '### 1. Parse the task',
+                '- Extract task_id, title, description, repo from the JSON payload',
+                '',
+                '### 2. Setup git',
+                '```bash',
+                'git config --global user.email "dante-neo-assistant@proton.me"',
+                'git config --global user.name "Neo"',
+                '```',
+                '',
+                '### 3. Clone the repo + create branch',
+                '```bash',
+                'WORK_DIR=$(mktemp -d)',
+                'git clone https://x-access-token:${GH_TOKEN}@github.com/{owner}/{repo}.git $WORK_DIR',
+                'cd $WORK_DIR',
+                'git checkout -b feat/{short-task-description}',
+                '```',
+                '',
+                '### 4. Spawn Codex/Claude Code to do the coding',
+                '**MANDATORY: ALL coding MUST be done by Codex/Claude Code. Do NOT write code yourself.**',
+                '',
+                'Build a detailed prompt for Codex that includes:',
+                '- The task title and full description',
+                '- Any relevant context from the task payload',
+                '- Specific files to modify if known',
+                '- The acceptance criteria',
+                '',
+                '```bash',
+                'cd $WORK_DIR',
+                'codex exec --model codex-5.3 --full-auto "Your detailed prompt here"',
+                '```',
+                '',
+                '### 5. Pre-push quality gates (NON-NEGOTIABLE)',
+                'After Codex finishes, verify the work:',
+                '',
+                '```bash',
+                '# For Node.js projects:',
+                'for f in $(git diff --name-only HEAD~1 | grep "\\.js$"); do node --check "$f"; done',
+                '',
+                '# For frontend projects with a client/ dir:',
+                'if [ -d client ]; then cd client && npm install && npm run build; cd ..; fi',
+                '',
+                '# For backend-only:',
+                'npm install && npm test 2>/dev/null || true',
+                '```',
+                '',
+                'If checks fail, spawn Codex again to fix: `codex --full-auto exec "Fix build errors: {paste errors}"`',
+                '',
+                '### 6. Commit and push',
+                '```bash',
+                'git add -A',
+                'git commit -m "{type}: {description} [task:{task_id}]"',
+                'git push -u origin feat/{short-task-description}',
+                '```',
+                '',
+                '### 7. Create PR',
+                '```bash',
+                'gh pr create --title "{task title}" --body "Task: {task_id}\\n\\n{description}" --base main',
+                '```',
+                '',
+                '### 8. Update task status',
+                'Use the curl command from the task payload. Include PR URL in pull_request_url.',
+                '',
+                '## Rules',
+                '- NEVER edit source code directly — always use Codex/Claude Code',
+                '- NEVER commit to main directly — always feature branch + PR',
+                '- NEVER push without passing quality gates',
+                '- If sub-agent fails twice, mark task as failed with explanation',
+                '- If the task requires DB migrations, execute them via SUPABASE_MGMT_TOKEN',
+              ].join('\n'));
+
+
+              // --- Write auth-profiles.json from env var (gitops-managed) ---
+              const authDir = '/root/.openclaw/agents/main/agent';
+              const authPath = authDir + '/auth-profiles.json';
+              fs.mkdirSync(authDir, { recursive: true });
+              const apiKey = e.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '';
+              if (apiKey) {
+                let existing = {};
+                try { existing = JSON.parse(fs.readFileSync(authPath, 'utf8')); } catch(_) {}
+                existing.version = 1;
+                existing.profiles = existing.profiles || {};
+                const isOAuth = apiKey.startsWith('sk-ant-oat01-');
+                existing.profiles['anthropic:default'] = isOAuth
+                  ? { type: 'oauth', provider: 'anthropic', access: apiKey }
+                  : { type: 'api_key', provider: 'anthropic', key: apiKey };
+                existing.lastGood = existing.lastGood || {};
+                existing.lastGood.anthropic = 'anthropic:default';
+                fs.writeFileSync(authPath, JSON.stringify(existing, null, 2));
+                console.log('auth-profiles.json written from ANTHROPIC_API_KEY');
+              }
+              console.log('Config + HEARTBEAT.md + SOUL.md + coding-task skill written OK');
+          envFrom:
+            - secretRef:
+                name: neo-worker-env
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
       containers:
-      - name: openclaw
-        image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
-        ports:
-        - containerPort: 18789
-        envFrom:
-        - secretRef:
-            name: neo-worker-env
-        env:
-        - name: PATH
-          value: /tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-        - name: ANTHROPIC_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: neo-worker-env
-              key: ANTHROPIC_API_KEY
-        - name: OPENAI_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: neo-worker-env
-              key: OPENAI_API_KEY
-        volumeMounts:
-        - name: data
-          mountPath: /root/.openclaw
-        - name: tools-bin
-          mountPath: /tools
-          readOnly: true
-        - name: ssh-out
-          mountPath: /root/.ssh
-          readOnly: true
-        resources:
-          requests:
-            cpu: 500m
-            memory: 512Mi
-          limits:
-            cpu: 2000m
-            memory: 2Gi
-        livenessProbe:
-          tcpSocket:
-            port: 18789
-          initialDelaySeconds: 120
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 5
-        readinessProbe:
-          tcpSocket:
-            port: 18789
-          initialDelaySeconds: 60
-          periodSeconds: 5
-          timeoutSeconds: 5
+        - name: openclaw
+          image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+          ports:
+            - containerPort: 18789
+          envFrom:
+            - secretRef:
+                name: neo-worker-env
+          env:
+            - name: PATH
+              value: /tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: neo-worker-env
+                  key: ANTHROPIC_API_KEY
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: neo-worker-env
+                  key: OPENAI_API_KEY
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
+            - name: tools-bin
+              mountPath: /tools
+              readOnly: true
+            - name: ssh-out
+              mountPath: /root/.ssh
+              readOnly: true
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          livenessProbe:
+            tcpSocket:
+              port: 18789
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 18789
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 5
       volumes:
-      - name: data
-        persistentVolumeClaim:
-          claimName: neo-worker-data
-      - name: tools-bin
-        emptyDir: {}
-      - name: ssh-out
-        emptyDir: {}
+        - name: data
+          persistentVolumeClaim:
+            claimName: neo-worker-data
+        - name: tools-bin
+          emptyDir: {}
+        - name: ssh-out
+          emptyDir: {}
       imagePullSecrets:
-      - name: ghcr-secret
+        - name: ghcr-secret
