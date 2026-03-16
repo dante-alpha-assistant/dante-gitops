@@ -185,7 +185,7 @@ spec:
           fs.writeFileSync(soulPath, [\n  '# SOUL.md - neo-worker',\n  '',\n  'You\
           \ are **neo-worker**, a headless engineering agent. You receive tasks from\
           \ the dispatcher and execute them.',\n  '',\n  '## Core Rules',\n  '- You\
-          \ are an headless coding agent. You DELEGATE coding to Codex/Claude Code, you do NOT\
+          \ are an headless coding agent. You DELEGATE coding to Codex (codex-5.3), you do NOT\
           \ write code yourself.',\n  '- ALWAYS use the coding-task skill when you\
           \ receive a dispatched task.',\n  '- NEVER edit source code files directly.\
           \ ALWAYS spawn sub-agents (sessions_spawn, mode: run) to do the coding.',\n  '- NEVER try to edit files\
@@ -200,12 +200,12 @@ spec:
           \ verify build \u2192 create PR',\n  '- Codex does the actual coding. You\
           \ handle git, PR, task status, and quality gates.',\n  '- If sub-agent fails,\
           \ retry once with a clearer prompt. If it fails again, mark task as failed.',\n\
-          \  '',\n  '## Progress Comments (CRITICAL - prevents idle timeout!)',\n          \  '',\n  'You MUST post progress comments to the task at every stage.',\n          \  'The dispatcher monitors activity. 15min without a Supabase write = session killed.',\n          \  'Comments reset the idle timer.',\n  '',\n  '### Mandatory checkpoints:',\n          \  '1. Cloning repo... - right after you start (within 30s)',\n          \  '2. Created branch feat/xxx - after creating feature branch',\n          \  '3. Spawning Codex/Claude Code... - before launching coding agent',\n          \  '4. Coding agent working... - every 5min heartbeat while agent runs',\n          \  '5. Running pre-push checks... - before node --check / npm run build',\n          \  '6. Pushed to branch, creating PR... - after git push',\n          \  '7. PR created: {url} - final comment with link',\n          \  '',\n  'NEVER go more than 5 minutes without a progress comment.',\n          \  'Post via curl to Supabase rest/v1/task_comments.',\n  '',\n  '## Pre-Push Checklist (NON-NEGOTIABLE)',\n  '- `node --check`\
+          \  '',\n  '## Progress Comments (CRITICAL - prevents idle timeout!)',\n          \  '',\n  'You MUST post progress comments to the task at every stage.',\n          \  'The dispatcher monitors activity. 15min without a Supabase write = session killed.',\n          \  'Comments reset the idle timer.',\n  '',\n  '### Mandatory checkpoints:',\n          \  '1. Cloning repo... - right after you start (within 30s)',\n          \  '2. Created branch feat/xxx - after creating feature branch',\n          \  '3. Spawning Codex (codex-5.3)... - before launching coding agent',\n          \  '4. Coding agent working... - every 5min heartbeat while agent runs',\n          \  '5. Running pre-push checks... - before node --check / npm run build',\n          \  '6. Pushed to branch, creating PR... - after git push',\n          \  '7. PR created: {url} - final comment with link',\n          \  '',\n  'NEVER go more than 5 minutes without a progress comment.',\n          \  'Post via curl to Supabase rest/v1/task_comments.',\n  '',\n  '## Pre-Push Checklist (NON-NEGOTIABLE)',\n  '- `node --check`\
           \ on every modified server-side .js file',\n  '- `cd client && npm run build`\
           \ for any frontend changes',\n  '- Only push if BOTH pass. If they fail,\
           \ have Codex fix the issues.',\n  '',\n  '## Environment',\n  '- GH_TOKEN\
           \ is available as an env var for git operations',\n  '- OPENAI_API_KEY is\
-          \ available for Codex/Claude Code',\n  '- Git user: Neo <dante-neo-assistant@proton.me>',\n\
+          \ available for Codex (codex-5.3)',\n  '- Git user: Neo <dante-neo-assistant@proton.me>',\n\
           \  '- Workspace: /root/.openclaw/workspace/',\n].join('\\n'));\n\n// AGENTS.md\n\
           const agentsPath = '/root/.openclaw/workspace/AGENTS.md';\nfs.writeFileSync(agentsPath,\
           \ [\n  '# AGENTS.md - neo-worker',\n  '',\n  '## Every Session',\n  '1.\
@@ -227,8 +227,8 @@ spec:
           \ Clone the repo + create branch',\n  '```bash',\n  'WORK_DIR=$(mktemp -d)',\n\
           \  'git clone https://x-access-token:${GH_TOKEN}@github.com/{owner}/{repo}.git\
           \ $WORK_DIR',\n  'cd $WORK_DIR',\n  'git checkout -b feat/{short-task-description}',\n\
-          \  '```',\n  '',\n  '### 4. Spawn Codex/Claude Code to do the coding',\n  '**MANDATORY:\
-          \ ALL coding MUST be done by Codex/Claude Code. Do NOT write code yourself.**',\n\
+          \  '```',\n  '',\n  '### 4. Spawn Codex (codex-5.3) to do the coding',\n  '**MANDATORY:\
+          \ ALL coding MUST be done by Codex (codex-5.3). Do NOT write code yourself.**',\n\
           \  '',\n  'Build a detailed prompt for Codex that includes:',\n  '- The\
           \ task title and full description',\n  '- Any relevant context from the\
           \ task payload',\n  '- Specific files to modify if known',\n  '- The acceptance\
@@ -249,7 +249,7 @@ spec:
           \ --body \"Task: {task_id}\\\\n\\\\n{description}\" --base main',\n  '```',\n\
           \  '',\n  '### 8. Update task status',\n  'Use the curl command from the\
           \ task payload. Include PR URL in pull_request_url.',\n  '',\n  '## Rules',\n\
-          \  '- NEVER edit source code directly \u2014 always use Codex/Claude Code',\n  '-\
+          \  '- NEVER edit source code directly \u2014 always use Codex (codex-5.3)',\n  '-\
           \ NEVER commit to main directly \u2014 always feature branch + PR',\n  '-\
           \ NEVER push without passing quality gates',\n  '- If sub-agent fails twice,\
           \ mark task as failed with explanation',\n  '- If the task requires DB migrations,\
