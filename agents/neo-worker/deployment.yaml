@@ -129,7 +129,15 @@ spec:
           \      payload: { kind: 'agentTurn', message: 'Run the heartbeat: update\
           \ your agent card. Read HEARTBEAT.MD and follow it.', timeoutSeconds: 30\
           \ },\n      delivery: { mode: 'none', channel: 'last' },\n      state: {\
-          \ nextRunAtMs: Date.now() + 300000 }\n    }]\n  };\n  fs.writeFileSync(cronPath,\
+          \ nextRunAtMs: Date.now() + 300000 }\n    },{
+      id: 'session-cleanup', name: 'session-cleanup', enabled: true,
+      createdAtMs: Date.now(), updatedAtMs: Date.now(),
+      schedule: { kind: 'every', everyMs: 600000, anchorMs: Date.now() },
+      sessionTarget: 'isolated', wakeMode: 'now',
+      payload: { kind: 'agentTurn', message: 'Clean zombie sessions by running exec: node -e "const fs=require(\\\\"fs\\\\");const p=\\\\"/root/.openclaw/agents/main/sessions/sessions.json\\\\";try{const d=JSON.parse(fs.readFileSync(p,\\\\"utf8\\\\"));const n=Date.now();const c={};let r=0;for(const[k,v]of Object.entries(d)){if(!v){r++;continue;}if(k===\\\\"agent:main:main\\\\"||k===\\\\"agent:main:cron:heartbeat-agent-card\\\\"||n-(v.updatedAt||0)<1800000){c[k]=v;}else{r++;}}fs.writeFileSync(p,JSON.stringify(c,null,2));console.log(\\\\"cleaned \\\\"+r)}catch(e){console.log(e.message)}" Reply done after.', timeoutSeconds: 30 },
+      delivery: { mode: 'none', channel: 'last' },
+      state: { nextRunAtMs: Date.now() + 600000 }
+    }]\n  };\n  fs.writeFileSync(cronPath,\
           \ JSON.stringify(cronJobs, null, 2));\n}\n// --- task-worker skill ---\n\
           const skillDir = '/root/.openclaw/workspace/skills/task-worker';\nfs.mkdirSync(skillDir,\
           \ { recursive: true });\nfs.writeFileSync(skillDir + '/SKILL.md', [\n  '#\
