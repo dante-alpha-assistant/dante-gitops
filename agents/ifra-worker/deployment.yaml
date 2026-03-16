@@ -100,15 +100,7 @@ spec:
           \      wakeMode: 'now',\n      payload: { kind: 'agentTurn', message: 'Run\
           \ the heartbeat: update your agent card. Read HEARTBEAT.MD and follow it.',\
           \ timeoutSeconds: 30 },\n      delivery: { mode: 'none', channel: 'last'\
-          \ },\n      state: { nextRunAtMs: Date.now() + 300000 }\n    },{
-      id: 'session-cleanup', name: 'session-cleanup', enabled: true,
-      createdAtMs: Date.now(), updatedAtMs: Date.now(),
-      schedule: { kind: 'every', everyMs: 600000, anchorMs: Date.now() },
-      sessionTarget: 'isolated', wakeMode: 'now',
-      payload: { kind: 'agentTurn', message: 'Clean zombie sessions by running exec: node -e "const fs=require(\\\\"fs\\\\");const p=\\\\"/root/.openclaw/agents/main/sessions/sessions.json\\\\";try{const d=JSON.parse(fs.readFileSync(p,\\\\"utf8\\\\"));const n=Date.now();const c={};let r=0;for(const[k,v]of Object.entries(d)){if(!v){r++;continue;}if(k===\\\\"agent:main:main\\\\"||k===\\\\"agent:main:cron:heartbeat-agent-card\\\\"||n-(v.updatedAt||0)<1800000){c[k]=v;}else{r++;}}fs.writeFileSync(p,JSON.stringify(c,null,2));console.log(\\\\"cleaned \\\\"+r)}catch(e){console.log(e.message)}" Reply done after.', timeoutSeconds: 30 },
-      delivery: { mode: 'none', channel: 'last' },
-      state: { nextRunAtMs: Date.now() + 600000 }
-    }]\n  };\n\
+          \ },\n      state: { nextRunAtMs: Date.now() + 300000 }\n    },{ id: 'session-cleanup', name: 'session-cleanup', enabled: true, createdAtMs: Date.now(), updatedAtMs: Date.now(), schedule: { kind: 'every', everyMs: 600000, anchorMs: Date.now() }, sessionTarget: 'isolated', wakeMode: 'now', payload: { kind: 'agentTurn', message: 'Clean zombie sessions. Remove sessions older than 30min. Keep main and cron heartbeat. Reply done.', timeoutSeconds: 30 }, delivery: { mode: 'none', channel: 'last' }, state: { nextRunAtMs: Date.now() + 600000 } }]\n  };\n\
           \  fs.writeFileSync(cronPath, JSON.stringify(cronJobs, null, 2));\n}\n//\
           \ SOUL.md for ifra-worker\nconst soulPath = '/root/.openclaw/workspace/SOUL.md';\n\
           fs.writeFileSync(soulPath, [\n  '# SOUL.md - ifra-worker',\n  '',\n  'You\
@@ -160,9 +152,9 @@ spec:
           \ true });\nconst apiKey = e.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY\
           \ || '';\nif (apiKey) {\n  let existing = {};\n  try { existing = JSON.parse(fs.readFileSync(authPath,\
           \ 'utf8')); } catch(_) {}\n  existing.version = 1;\n  existing.profiles\
-          \ = existing.profiles || {};\n  const isOAuth = apiKey.startsWith('sk-ant-oat01-');\n\
+          \ = existing.profiles || {};\n  const isOAuth = apiKey.startsWith('sk-ant-oat01-');\n  const refreshKey = process.env.ANTHROPIC_REFRESH_TOKEN || '';\n  const expiresMs = parseInt(process.env.ANTHROPIC_TOKEN_EXPIRES || '0', 10);\n\
           \  existing.profiles['anthropic:default'] = isOAuth\n    ? { type: 'oauth',\
-          \ provider: 'anthropic', access: apiKey }\n    : { type: 'api_key', provider:\
+          \ provider: 'anthropic', access: apiKey }, refreshKey ? { refresh: refreshKey } : {}, expiresMs ? { expires: expiresMs } : {})\n    : { type: 'api_key', provider:\
           \ 'anthropic', key: apiKey };\n  existing.lastGood = existing.lastGood ||\
           \ {};\n  existing.lastGood.anthropic = 'anthropic:default';\n  fs.writeFileSync(authPath,\
           \ JSON.stringify(existing, null, 2));\n  console.log('auth-profiles.json\
