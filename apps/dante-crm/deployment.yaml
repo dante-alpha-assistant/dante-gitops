@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dante-crm
+  namespace: dante
+  labels:
+    app: dante-crm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dante-crm
+  template:
+    metadata:
+      labels:
+        app: dante-crm
+    spec:
+      containers:
+        - name: dante-crm
+          image: ghcr.io/dante-alpha-assistant/dante-crm:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 4000
+          envFrom:
+            - secretRef:
+                name: dante-crm-env
+          env:
+            - name: PORT
+              value: "4000"
+            - name: NODE_ENV
+              value: "production"
+            - name: CORS_ORIGIN
+              value: "https://crm.dante.id"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 4000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 4000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 3
+      imagePullSecrets:
+        - name: ghcr-secret
