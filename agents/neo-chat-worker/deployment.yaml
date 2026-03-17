@@ -146,7 +146,14 @@ spec:
               fs.mkdirSync(authDir, { recursive: true });
               const apiKey = e.ANTHROPIC_API_KEY || '';
               if (apiKey) {
-                const auth = { version: 1, profiles: { 'anthropic:default': { type: 'token', provider: 'anthropic', token: apiKey } }, lastGood: { anthropic: 'anthropic:default' } };
+                const refreshToken = e.ANTHROPIC_REFRESH_TOKEN || '';
+                const tokenExpires = parseInt(e.ANTHROPIC_TOKEN_EXPIRES || '0', 10);
+                let auth;
+                if (refreshToken && tokenExpires) {
+                  auth = { version: 1, profiles: { 'anthropic:default': { type: 'oauth', provider: 'anthropic', access: apiKey, refresh: refreshToken, expires: tokenExpires } }, lastGood: { anthropic: 'anthropic:default' } };
+                } else {
+                  auth = { version: 1, profiles: { 'anthropic:default': { type: 'token', provider: 'anthropic', token: apiKey } }, lastGood: { anthropic: 'anthropic:default' } };
+                }
                 fs.writeFileSync(authDir + '/auth-profiles.json', JSON.stringify(auth, null, 2));
               }
               // Remove default files that bloat system prompt
