@@ -121,16 +121,7 @@ spec:
           \ 'utf8').includes('Keep this file empty')) {\n  fs.writeFileSync(hbPath,\
           \ heartbeat);\n}\n// Seed heartbeat cron job\nconst cronDir = '/root/.openclaw/cron';\n\
           const cronPath = cronDir + '/jobs.json';\nfs.mkdirSync(cronDir, { recursive:\
-          \ true });\nif (!fs.existsSync(cronPath)) {\n  const cronJobs = {\n    version:\
-          \ 1,\n    jobs: [{\n      id: 'heartbeat-agent-card',\n      name: 'heartbeat-agent-card',\n\
-          \      enabled: true,\n      createdAtMs: Date.now(),\n      updatedAtMs:\
-          \ Date.now(),\n      schedule: { kind: 'every', everyMs: 300000, anchorMs:\
-          \ Date.now() },\n      sessionTarget: 'isolated',\n      wakeMode: 'now',\n\
-          \      payload: { kind: 'agentTurn', message: 'Run the heartbeat: update\
-          \ your agent card. Read HEARTBEAT.MD and follow it.', timeoutSeconds: 30\
-          \ },\n      delivery: { mode: 'none', channel: 'last' },\n      state: {\
-          \ nextRunAtMs: Date.now() + 300000 }\n    },{ id: 'session-cleanup', name: 'session-cleanup', enabled: true, createdAtMs: Date.now(), updatedAtMs: Date.now(), schedule: { kind: 'every', everyMs: 600000, anchorMs: Date.now() }, sessionTarget: 'isolated', wakeMode: 'now', payload: { kind: 'agentTurn', message: 'Clean zombie sessions. Run exec to remove sessions older than 30min from sessions.json. Keep agent:main:main and cron:heartbeat. Reply done.', timeoutSeconds: 30 }, delivery: { mode: 'none', channel: 'last' }, state: { nextRunAtMs: Date.now() + 600000 } }]\n  };\n  fs.writeFileSync(cronPath,\
-          \ JSON.stringify(cronJobs, null, 2));\n}\n// --- task-worker skill ---\n\
+          \ 1,\n    jobs: []\n  };\n  fs.writeFileSync(cronPath,\n          \ JSON.stringify(cronJobs, null, 2));\n}\n// --- task-worker skill ---\n\
           const skillDir = '/root/.openclaw/workspace/skills/task-worker';\nfs.mkdirSync(skillDir,\
           \ { recursive: true });\nfs.writeFileSync(skillDir + '/SKILL.md', [\n  '#\
           \ task-worker \u2014 Dispatched Task Execution Skill',\n  '',\n  '## When\
