@@ -25,13 +25,7 @@ spec:
       initContainers:
         - name: init-config
           image: node:22-bookworm-slim
-          command: ["sh", "-c"]
-          args:
-            - |
-              # Install js-yaml for config parsing
-              npm install -g js-yaml
-              # Run the init script from configmap
-              node /init/init.js
+          command: ["node", "/init/init.js"]
           volumeMounts:
             - name: init-config
               mountPath: /init

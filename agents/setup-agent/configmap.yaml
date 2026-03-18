@@ -6,99 +6,87 @@ metadata:
 data:
   init.js: |
     const fs = require('fs');
-    const path = require('path');
 
     console.log('=== setup-agent init config ===');
+
+    const e = process.env;
 
     // Ensure directories exist
     fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
     fs.mkdirSync('/root/.openclaw/workspace/skills', { recursive: true });
     fs.mkdirSync('/root/.openclaw/workspace/credentials', { recursive: true });
+    fs.mkdirSync('/root/.openclaw/agents/main/agent', { recursive: true });
 
-    // Write gateway.yaml — kimi-k2.5 as primary (OpenRouter), anthropic as secondary
-    const gatewayConfig = {
+    // Write openclaw.json — no js-yaml dependency needed, pure JSON
+    const config = {
+      gateway: {
+        port: 18789,
+        mode: 'local',
+        bind: 'lan',
+        auth: { mode: 'token', token: e.OPENCLAW_GATEWAY_TOKEN || 'setup-agent-gw-tok-2026' },
+        tools: { allow: ['sessions_spawn','sessions_send','sessions_list','sessions_history','session_status','cron'] },
+        controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
+      },
       models: {
         providers: {
-          'openrouter': {
-            url: 'https://openrouter.ai/api/v1/chat/completions',
-            headers: {
-              'HTTP-Referer': 'https://openclaw.ai',
-              'X-Title': 'OpenClaw'
-            }
-          },
-          'anthropic': {
-            url: 'https://api.anthropic.com/v1/messages'
+          openrouter: {
+            baseUrl: 'https://openrouter.ai/api/v1',
+            apiKey: e.OPENROUTER_API_KEY || '',
+            models: [
+              { id: 'moonshotai/kimi-k2.5', name: 'kimi-k2.5', api: 'openai-completions', reasoning: true, input: ['text','image'], cost: { input: 0.45, output: 2.25, cacheRead: 0.07, cacheWrite: 0 }, contextWindow: 262144, maxTokens: 8192 },
+              { id: 'google/gemini-2.0-flash-001', name: 'gemini-flash', api: 'openai-completions', input: ['text','image'], cost: { input: 0.1, output: 0.4, cacheRead: 0, cacheWrite: 0 }, contextWindow: 128000, maxTokens: 8192 }
+            ]
           }
-        },
-        default: 'openrouter/moonshotai/kimi-k2.5',
-        aliases: {
-          'default': 'openrouter/moonshotai/kimi-k2.5',
-          'kimi': 'openrouter/moonshotai/kimi-k2.5',
-          'haiku': 'anthropic/claude-haiku-3-5',
-          'sonnet': 'anthropic/claude-sonnet-4-5'
         }
       },
-      tools: {
-        allow: ['sessions_spawn', 'sessions_send']
+      agents: {
+        defaults: {
+          model: { primary: 'openrouter/moonshotai/kimi-k2.5' },
+          workspace: '/root/.openclaw/workspace',
+          compaction: { mode: 'safeguard' },
+          maxConcurrent: 8,
+          sandbox: { browser: { enabled: false } },
+          subagents: { maxConcurrent: 4 },
+          heartbeat: { every: '5m' }
+        }
       },
-      channels: {
-        telegram: { enabled: false }
-      }
+      hooks: {
+        enabled: true,
+        token: 'setup-agent-hooks-tok-2026',
+        allowRequestSessionKey: true,
+        defaultSessionKey: 'hook:default',
+        allowedSessionKeyPrefixes: ['hook:']
+      },
+      tools: { sessions: { visibility: 'all' } }
     };
-    fs.writeFileSync('/root/.openclaw/gateway.yaml', require('js-yaml').dump(gatewayConfig));
+    fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
 
-    // Write auth-profiles.json — OpenRouter token + Anthropic API key (direct, not OAuth)
+    // Write auth-profiles — OpenRouter token + Anthropic direct API key
     const authProfiles = {
       'openrouter:default': {
-        type: 'token',
-        token: process.env.OPENROUTER_API_KEY
+        type: 'api_key',
+        provider: 'openrouter',
+        key: e.OPENROUTER_API_KEY || ''
       },
       'anthropic:default': {
         type: 'api_key',
-        key: process.env.ANTHROPIC_API_KEY
+        provider: 'anthropic',
+        key: e.ANTHROPIC_API_KEY || ''
       }
     };
-    fs.writeFileSync('/root/.openclaw/auth-profiles.json', JSON.stringify(authProfiles, null, 2));
+    fs.writeFileSync('/root/.openclaw/agents/main/agent/auth-profiles.json', JSON.stringify(authProfiles, null, 2));
 
     // Write agent identity
-    const identity = {
-      name: 'Setup Agent',
-      emoji: '⚙️',
-      description: 'Infrastructure setup and deployment specialist',
-      model: 'openrouter/openai/gpt-5.4-hybrid'
-    };
-    fs.writeFileSync('/root/.openclaw/workspace/IDENTITY.md', 
-      `# IDENTITY.md\n\n- **Name:** ${identity.name}\n- **Emoji:** ${identity.emoji}\n- **Description:** ${identity.description}\n`);
+    fs.writeFileSync('/root/.openclaw/workspace/IDENTITY.md',
+      '# IDENTITY.md\n\n- **Name:** Setup Agent\n- **Emoji:** ⚙️\n- **Description:** Infrastructure setup and deployment specialist\n');
 
-    // Write Supabase agent card
-    const agentCard = {
-      id: 'setup-agent',
-      name: 'Setup Agent',
-      emoji: '⚙️',
-      description: 'Infrastructure setup and deployment specialist',
-      model: 'openrouter/openai/gpt-5.4-hybrid',
-      status: 'active',
-      task_types: ['setup'],
-      available_credentials: [
-        'GH_TOKEN',
-        'SUPABASE_SERVICE_ROLE_KEY', 
-        'SUPABASE_MGMT_TOKEN',
-        'VERCEL_TOKEN',
-        'OPENAI_API_KEY',
-        'OPENROUTER_API_KEY',
-        'ANTHROPIC_API_KEY'
-      ],
-      last_seen: new Date().toISOString()
-    };
-
-    console.log('Writing agent card to Supabase...');
     console.log([
       'Agent capabilities:',
       '- Vercel deployments and project setup',
-      '- Database schema initialization', 
+      '- Database schema initialization',
       '- Environment variable configuration',
       '- K8s resource provisioning',
-      '- Use GPT-5.4 hybrid for complex infrastructure tasks',
+      '- Primary model: kimi-k2.5 via OpenRouter',
       '- Handle setup task type exclusively'
     ].join('\n'));
 
