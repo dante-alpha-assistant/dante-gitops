@@ -51,7 +51,7 @@ data:
     var sbUrl = "https://lessxkxujvcmublgwdaa.supabase.co";
     var sbKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI";
     fs.writeFileSync("/root/.openclaw/workspace/HEARTBEAT.md", "# HEARTBEAT.md - Agent Card Self-Update\n\n## Step 1: Check status\n```bash\nSTATUS=$(curl -s \"" + sbUrl + "/rest/v1/agent_cards?id=eq.research-worker&select=status\" -H \"apikey: " + sbKey + "\" -H \"Authorization: Bearer " + sbKey + "\" | grep -o '\"status\":\"[^\"]*\"' | cut -d'\"' -f4)\necho \"Current status: $STATUS\"\n```\nIf disabled, reply HEARTBEAT_OK.\n\n## Step 2: Update agent card\n```bash\ncurl -s -X PATCH \"" + sbUrl + "/rest/v1/agent_cards?id=eq.research-worker\" -H \"apikey: " + sbKey + "\" -H \"Authorization: Bearer " + sbKey + "\" -H \"Content-Type: application/json\" -d '{\"status\":\"online\",\"last_heartbeat\":\"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}'\n```\nReply HEARTBEAT_OK.");
-    fs.writeFileSync("/root/.openclaw/workspace/skills/task-worker/SKILL.md", "# task-worker - Research Task Execution\n\n## When to Use\nWhen you receive a dispatched task with a JSON payload.\n\n## Steps\n1. Parse the task payload (task_id, title, description)\n2. Conduct thorough web research using multiple search queries\n3. Cross-reference sources, check dates, verify claims\n4. Write findings to research/{topic-slug}.md\n5. Update task status via the curl commands in the payload\n\n## Status Updates\nAlways update task status when done. Include summary in result field.");
+    fs.writeFileSync("/root/.openclaw/workspace/skills/task-worker/SKILL.md", "# task-worker - Research Task Execution\n\n## When to Use\nWhen you receive a dispatched task with a JSON payload.\n\n## Steps\n1. Parse the task payload (task_id, title, description)\n2. Conduct thorough web research using multiple search queries\n3. Cross-reference sources, check dates, verify claims\n4. Write findings to workspace/research/{topic-slug}.md\n5. **MANDATORY**: Include the FULL research document in the task result artifacts\n6. Update task status via the curl commands in the payload\n\n## Deliverable Attachment (CRITICAL)\nYour workspace is EPHEMERAL. Files saved locally are LOST when the pod dies.\nYou MUST include the full research content when updating task status.\n\nIn the result JSON, use this format:\n- result.summary = executive summary (3-5 sentences)\n- result.artifacts = [{type: markdown, filename: research-topic.md, content: FULL MD CONTENT}]\n\nIf content is too large for the status update payload, push the file to the app GitHub repo under docs/research/ and include the commit URL in artifacts instead.\n\n## Status Updates\nAlways update task status when done. Include summary AND full content in result field.\nNEVER mark complete without attaching the research content to the task result.");
     var cronDir = "/root/.openclaw/cron";
     fs.mkdirSync(cronDir, { recursive: true });
     if (!fs.existsSync(cronDir + "/jobs.json")) {
@@ -72,7 +72,12 @@ data:
     fs.mkdirSync(authDir, { recursive: true });
     var apiKey = e.ANTHROPIC_API_KEY || "";
     if (apiKey) {
-      var auth = { version: 1, profiles: { "anthropic:default": { type: "token", provider: "anthropic", token: apiKey } }, lastGood: { anthropic: "anthropic:default" } };
+      var isOAuth = apiKey.startsWith("sk-ant-oat");
+    var isApiKey = apiKey.startsWith("sk-ant-api");
+    var profile = isOAuth
+      ? { type: "oauth", provider: "anthropic", access: apiKey, refresh: e.ANTHROPIC_REFRESH_TOKEN || "", expires: parseInt(e.ANTHROPIC_TOKEN_EXPIRES || "0") || 0 }
+      : { type: "api_key", provider: "anthropic", key: apiKey };
+    var auth = { version: 1, profiles: { "anthropic:default": profile }, lastGood: { anthropic: "anthropic:default" } };
       fs.writeFileSync(authDir + "/auth-profiles.json", JSON.stringify(auth, null, 2));
       console.log("auth-profiles.json written");
     }
