@@ -121,7 +121,7 @@ spec:
           \ 'utf8').includes('Keep this file empty')) {\n  fs.writeFileSync(hbPath,\
           \ heartbeat);\n}\n// Seed heartbeat cron job\nconst cronDir = '/root/.openclaw/cron';\n\
           const cronPath = cronDir + '/jobs.json';\nfs.mkdirSync(cronDir, { recursive:\
-          \ 1,\n    jobs: []\n  };\n  fs.writeFileSync(cronPath,\n          \ JSON.stringify(cronJobs, null, 2));\n}\n// --- task-worker skill ---\n\
+          \ true });\nif (!fs.existsSync(cronPath)) {\n  const cronJobs = {\n    version:\n          \ 1,\n    jobs: []\n  };\n  fs.writeFileSync(cronPath,\n          \ JSON.stringify(cronJobs, null, 2));\n}\n// --- task-worker skill ---\n\
           const skillDir = '/root/.openclaw/workspace/skills/task-worker';\nfs.mkdirSync(skillDir,\
           \ { recursive: true });\nfs.writeFileSync(skillDir + '/SKILL.md', [\n  '#\
           \ task-worker \u2014 Dispatched Task Execution Skill',\n  '',\n  '## When\
