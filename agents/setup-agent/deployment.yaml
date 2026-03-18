@@ -19,7 +19,7 @@ spec:
         app: setup-agent
         role: worker
       annotations:
-        config/restart-trigger: "2026-03-18-key-rotation"
+        config/restart-trigger: "2026-03-18-kimi-model"
     spec:
       serviceAccountName: openclaw-agents
       initContainers:
