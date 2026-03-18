@@ -5,3 +5,4 @@ resources:
   - service.yaml
   - pvc.yaml
   - sealed-secret.yaml
+  - app-credential-configmap.yaml
