@@ -1,0 +1,178 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: neo-worker-enhanced-init
+  namespace: agents
+data:
+  init-with-app-creds.js: |
+    // Enhanced OpenClaw init with app credential support
+    const fs = require('fs');
+    const e = process.env;
+
+    // Standard OpenClaw configuration
+    const config = {
+      gateway: {
+        port: 18789,
+        mode: "local",
+        bind: "lan",
+        auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "" },
+        http: { endpoints: { chatCompletions: { enabled: true } } },
+        tools: { allow: ["Read","Write","Edit","exec","web_fetch","web_search","browser","image","sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] },
+        controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
+      },
+      models: {
+        providers: {
+          anthropic: {
+            baseUrl: "https://api.anthropic.com",
+            models: [
+              { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6", api: "anthropic-messages", reasoning: true, input: ["text","image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 },
+              { id: "claude-opus-4-6", name: "claude-opus-4-6", api: "anthropic-messages", reasoning: true, input: ["text","image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 }
+            ]
+          },
+          openrouter: {
+            baseUrl: "https://openrouter.ai/api/v1",
+            apiKey: e.OPENROUTER_API_KEY || "",
+            models: [
+              { id: "anthropic/claude-sonnet-4-6", name: "claude-sonnet-4-6", api: "openai-completions", reasoning: false, input: ["text","image"], cost: { input: 3, output: 15, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 },
+              { id: "moonshotai/kimi-k2.5", name: "kimi-k2.5", api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 0.45, output: 2.25, cacheRead: 0.07, cacheWrite: 0 }, contextWindow: 262144, maxTokens: 8192 }
+            ]
+          },
+          openai: {
+            baseUrl: "https://api.openai.com/v1",
+            apiKey: e.OPENAI_API_KEY || "",
+            auth: "api-key",
+            api: "openai-responses",
+            models: [
+              { id: "gpt-5.2-codex", name: "gpt-5.2-codex", api: "openai-responses", reasoning: true, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 400000, maxTokens: 16384 }
+            ]
+          }
+        }
+      },
+      agents: {
+        defaults: {
+          model: { primary: "anthropic/claude-sonnet-4-6" },
+          workspace: "/root/.openclaw/workspace",
+          compaction: { mode: "safeguard" },
+          maxConcurrent: 4,
+          sandbox: { browser: { enabled: true, headless: true } },
+          subagents: { maxConcurrent: 8 },
+          heartbeat: { every: "5m" }
+        }
+      },
+      hooks: { 
+        enabled: true, 
+        token: "neo-worker-hooks-tok-2026", 
+        allowRequestSessionKey: true, 
+        defaultSessionKey: "hook:default", 
+        allowedSessionKeyPrefixes: ["hook:"] 
+      },
+      tools: { sessions: { visibility: "all" } },
+      acp: { enabled: true, backend: "acpx", defaultAgent: "codex", allowedAgents: ["codex"], maxConcurrentSessions: 4, stream: { coalesceIdleMs: 300, maxChunkChars: 1200 }, runtime: { ttlMinutes: 60 } },
+      plugins: { entries: { acpx: { enabled: true, config: { permissionMode: "approve-all", nonInteractivePermissions: "deny" } } } }
+    };
+
+    // Create directories
+    fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
+    fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
+
+    // Write OpenClaw config
+    fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
+
+    // Copy app credential processor
+    if (fs.existsSync('/opt/app-credentials/process-app-creds.sh')) {
+      fs.copyFileSync('/opt/app-credentials/process-app-creds.sh', '/root/.openclaw/process-app-creds.sh');
+      fs.chmodSync('/root/.openclaw/process-app-creds.sh', 0o755);
+      console.log('App credential processor installed');
+    }
+
+    // Enhanced SOUL.md with app credential support
+    const agentId = 'neo-worker';
+    const soulContent = `# SOUL.md - ${agentId} (Enhanced with App Credentials)
+
+    You are **${agentId}**, a headless engineering agent with automatic app-level credential support.
+
+    ## 🔐 App Credential System
+    When you receive tasks, credentials are automatically injected based on the task's app_id:
+
+    ### Checking Available Credentials
+    \`\`\`bash
+    # Check what app credentials are available
+    env | grep -E "(TURSO_|VERCEL_|ANTHROPIC_|OPENROUTER_)"
+
+    # For Unifounder tasks, these should be automatically set:
+    echo "TURSO_AUTH_TOKEN: \${TURSO_AUTH_TOKEN:0:10}..."
+    echo "TURSO_DATABASE_URL: \${TURSO_DATABASE_URL:0:30}..."
+    echo "VERCEL_TOKEN: \${VERCEL_TOKEN:0:10}..."
+    \`\`\`
+
+    ### Session Credential Loading (if needed)
+    \`\`\`bash
+    # Load session credentials if not in environment
+    if [ -f "/tmp/session-app-creds.env" ]; then
+        source "/tmp/session-app-creds.env"
+        echo "App credentials loaded from session file"
+    fi
+    \`\`\`
+
+    ## Core Rules (unchanged)
+    - You are a headless coding agent. You DELEGATE coding to Codex (codex-5.3), you do NOT write code yourself.
+    - ALWAYS use the coding-task skill when you receive a dispatched task.
+    - NEVER edit source code files directly. ALWAYS spawn sub-agents (sessions_spawn, mode: run) to do the coding.
+    - NEVER try to edit files without cloning the repo first.
+    - ALWAYS create a feature branch, never commit to main directly.
+    - ALWAYS create a PR with a clear title and description.
+    - ALWAYS update task status when done (done on success, failed on error).
+
+    ## Environment
+    - App credentials are automatically injected based on task.app_id
+    - Check environment variables for available credentials
+    - All tools (kubectl, git, gh) available
+    `;
+
+    fs.writeFileSync('/root/.openclaw/workspace/SOUL.md', soulContent);
+
+    // Enhanced task-worker skill with app credential awareness
+    const skillDir = '/root/.openclaw/workspace/skills/task-worker';
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(skillDir + '/SKILL.md', `# task-worker — Dispatched Task Execution Skill (Enhanced)
+
+    ## When to Use
+    This skill applies to EVERY message from "Task Dispatcher" that contains a JSON task payload.
+    If you see \`## Task Assigned:\` in the message, follow this skill.
+
+    ## 🔐 App Credential Support
+    Tasks may include app-specific credentials automatically:
+    - Check environment: \`env | grep -E "(TURSO_|VERCEL_|ANTHROPIC_)"\`
+    - Credentials are pre-configured for the task's app_id
+    - Use directly in your commands (no setup required)
+
+    ## Enhanced Features
+    - ✅ App-level credentials automatically available
+    - ✅ Secure credential isolation per session  
+    - ✅ Zero-configuration credential access
+    - ✅ Support for TURSO, Vercel, Anthropic, OpenRouter APIs
+    `);
+
+    // Write auth-profiles.json
+    const authDir = '/root/.openclaw/agents/main/agent';
+    const authPath = authDir + '/auth-profiles.json';
+    fs.mkdirSync(authDir, { recursive: true });
+    const apiKey = e.ANTHROPIC_API_KEY || '';
+    if (apiKey) {
+      let existing = {};
+      try { existing = JSON.parse(fs.readFileSync(authPath, 'utf8')); } catch(_) {}
+      existing.version = 1;
+      existing.profiles = existing.profiles || {};
+      const isOAuth = apiKey.startsWith('sk-ant-oat01-');
+      const refreshKey = e.ANTHROPIC_REFRESH_TOKEN || '';
+      const expiresMs = parseInt(e.ANTHROPIC_TOKEN_EXPIRES || '0', 10);
+      existing.profiles['anthropic:default'] = isOAuth
+        ? Object.assign({ type: 'oauth', provider: 'anthropic', access: apiKey }, refreshKey ? { refresh: refreshKey } : {}, expiresMs ? { expires: expiresMs } : {})
+        : { type: 'api_key', provider: 'anthropic', key: apiKey };
+      existing.lastGood = existing.lastGood || {};
+      existing.lastGood.anthropic = 'anthropic:default';
+      fs.writeFileSync(authPath, JSON.stringify(existing, null, 2));
+    }
+
+    console.log('Enhanced OpenClaw config with app credential support written');

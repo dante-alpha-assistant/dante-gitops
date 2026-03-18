@@ -53,8 +53,8 @@ spec:
         image: node:22-bookworm-slim
         command:
         - node
-        - -e
         args:
+        - /opt/enhanced-init/init-with-app-creds.js
         - "const fs = require('fs');\nconst e = process.env;\nconst config = {\n \
           \ gateway: {\n    port: 18789,\n    mode: \"local\",\n    bind: \"lan\"\
           ,\n    auth: { mode: \"token\", token: e.OPENCLAW_GATEWAY_TOKEN || \"\"\
@@ -264,6 +264,12 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /root/.openclaw
+        - name: app-credentials
+          mountPath: /opt/app-credentials
+          readOnly: true
+        - name: enhanced-init
+          mountPath: /opt/enhanced-init
+          readOnly: true
       containers:
       - name: openclaw
         image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
@@ -294,6 +300,9 @@ spec:
         - name: ssh-out
           mountPath: /root/.ssh
           readOnly: true
+        - name: app-credentials
+          mountPath: /opt/app-credentials
+          readOnly: true
         resources:
           requests:
             cpu: 500m
@@ -322,5 +331,13 @@ spec:
         emptyDir: {}
       - name: ssh-out
         emptyDir: {}
+      - name: app-credentials
+        configMap:
+          name: neo-worker-app-credentials
+          defaultMode: 0755
+      - name: enhanced-init
+        configMap:
+          name: neo-worker-enhanced-init
+          defaultMode: 0755
       imagePullSecrets:
       - name: ghcr-secret

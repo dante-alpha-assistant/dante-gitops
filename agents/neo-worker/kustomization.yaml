@@ -6,3 +6,4 @@ resources:
   - pvc.yaml
   - sealed-secret.yaml
   - app-credential-configmap.yaml
+  - enhanced-init-configmap.yaml
