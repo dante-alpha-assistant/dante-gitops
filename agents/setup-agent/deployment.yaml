@@ -21,6 +21,7 @@ spec:
       annotations:
         config/restart-trigger: "2026-03-18-kimi-model"
     spec:
+      serviceAccountName: default
       initContainers:
         - name: init-config
           image: node:22-bookworm-slim
