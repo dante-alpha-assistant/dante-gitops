@@ -59,6 +59,12 @@ spec:
               value: "ifra-hooks-tok-2026"
             - name: IFRA_WORKER_GATEWAY_TOKEN
               value: "ifra-worker-gw-tok-2026"
+            - name: SETUP_AGENT_HOOKS_TOKEN
+              value: "setup-agent-hooks-tok-2026"
+            - name: SETUP_AGENT_HOOKS_URL
+              value: "http://setup-agent.agents.svc.cluster.local:18789/hooks/agent"
+            - name: SETUP_AGENT_GATEWAY_TOKEN
+              value: "setup-agent-gw-tok-2026"
             - name: RESEARCH_WORKER_HOOKS_TOKEN
               value: "research-worker-hooks-tok-2026"
             - name: RESEARCH_WORKER_GATEWAY_TOKEN
