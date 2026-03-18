@@ -15,7 +15,7 @@ data:
     fs.mkdirSync('/root/.openclaw/workspace/skills', { recursive: true });
     fs.mkdirSync('/root/.openclaw/workspace/credentials', { recursive: true });
 
-    // Write gateway.yaml (kimi model via OpenRouter)
+    // Write gateway.yaml — kimi-k2.5 as primary (OpenRouter), anthropic as secondary
     const gatewayConfig = {
       models: {
         providers: {
@@ -25,12 +25,17 @@ data:
               'HTTP-Referer': 'https://openclaw.ai',
               'X-Title': 'OpenClaw'
             }
+          },
+          'anthropic': {
+            url: 'https://api.anthropic.com/v1/messages'
           }
         },
-        default: 'openrouter/openai/gpt-5.4-hybrid',
+        default: 'openrouter/moonshotai/kimi-k2.5',
         aliases: {
-          'default': 'openrouter/openai/gpt-5.4-hybrid',
-          'kimi': 'openrouter/moonshotai/kimi-k2.5'
+          'default': 'openrouter/moonshotai/kimi-k2.5',
+          'kimi': 'openrouter/moonshotai/kimi-k2.5',
+          'haiku': 'anthropic/claude-haiku-3-5',
+          'sonnet': 'anthropic/claude-sonnet-4-5'
         }
       },
       tools: {
@@ -42,18 +47,15 @@ data:
     };
     fs.writeFileSync('/root/.openclaw/gateway.yaml', require('js-yaml').dump(gatewayConfig));
 
-    // Write auth-profiles.json
+    // Write auth-profiles.json — OpenRouter token + Anthropic API key (direct, not OAuth)
     const authProfiles = {
       'openrouter:default': {
         type: 'token',
         token: process.env.OPENROUTER_API_KEY
       },
       'anthropic:default': {
-        type: 'oauth',
-        client_id: 'claude-cli-f6e4f0ad-5eac-4821-9f5e-2dc53b40ee4b',
-        access_token: process.env.ANTHROPIC_API_KEY,
-        refresh_token: process.env.ANTHROPIC_REFRESH_TOKEN,
-        expires_at: parseInt(process.env.ANTHROPIC_TOKEN_EXPIRES || '0')
+        type: 'api_key',
+        key: process.env.ANTHROPIC_API_KEY
       }
     };
     fs.writeFileSync('/root/.openclaw/auth-profiles.json', JSON.stringify(authProfiles, null, 2));
