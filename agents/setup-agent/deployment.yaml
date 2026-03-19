@@ -43,14 +43,16 @@ spec:
               set -e
               apt-get update -qq && apt-get install -y -qq curl >/dev/null 2>&1
               # Install kubectl
-              curl -sLo /tools/kubectl "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              KUBE_VERSION=$(curl -sL https://dl.k8s.io/release/stable.txt)
+              curl -sLo /tools/kubectl "https://dl.k8s.io/release/${KUBE_VERSION}/bin/linux/amd64/kubectl"
               chmod +x /tools/kubectl
+              echo "kubectl ${KUBE_VERSION} installed"
               # Install kubeseal
               KUBESEAL_VERSION=$(curl -s https://api.github.com/repos/bitnami-labs/sealed-secrets/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
-              curl -sLo /tools/kubeseal "https://github.com/bitnami-labs/sealed-secrets/releases/download/v${KUBESEAL_VERSION}/kubeseal-${KUBESEAL_VERSION}-linux-amd64.tar.gz" | tar -xz -C /tools kubeseal 2>/dev/null || \
-                (curl -sLo /tmp/kubeseal.tar.gz "https://github.com/bitnami-labs/sealed-secrets/releases/download/v${KUBESEAL_VERSION}/kubeseal-${KUBESEAL_VERSION}-linux-amd64.tar.gz" && tar -xzf /tmp/kubeseal.tar.gz -C /tools kubeseal)
+              curl -sLo /tmp/kubeseal.tar.gz "https://github.com/bitnami-labs/sealed-secrets/releases/download/v${KUBESEAL_VERSION}/kubeseal-${KUBESEAL_VERSION}-linux-amd64.tar.gz"
+              tar -xzf /tmp/kubeseal.tar.gz -C /tools kubeseal
               chmod +x /tools/kubeseal
-              echo "Tools installed: kubectl=$(ls -la /tools/kubectl) kubeseal=$(ls -la /tools/kubeseal)"
+              echo "kubeseal ${KUBESEAL_VERSION} installed"
           volumeMounts:
             - name: tools
               mountPath: /tools
