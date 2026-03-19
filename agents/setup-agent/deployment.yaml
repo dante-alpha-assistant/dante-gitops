@@ -21,7 +21,7 @@ spec:
       annotations:
         config/restart-trigger: "2026-03-18-kimi-model"
     spec:
-      serviceAccountName: default
+      serviceAccountName: setup-agent
       initContainers:
         - name: init-config
           image: node:22-bookworm-slim
@@ -34,18 +34,43 @@ spec:
           envFrom:
             - secretRef:
                 name: setup-agent-env
+        # Install kubectl and kubeseal for credential sealing
+        - name: install-tools
+          image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              apt-get update -qq && apt-get install -y -qq curl >/dev/null 2>&1
+              # Install kubectl
+              curl -sLo /tools/kubectl "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              chmod +x /tools/kubectl
+              # Install kubeseal
+              KUBESEAL_VERSION=$(curl -s https://api.github.com/repos/bitnami-labs/sealed-secrets/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
+              curl -sLo /tools/kubeseal "https://github.com/bitnami-labs/sealed-secrets/releases/download/v${KUBESEAL_VERSION}/kubeseal-${KUBESEAL_VERSION}-linux-amd64.tar.gz" | tar -xz -C /tools kubeseal 2>/dev/null || \
+                (curl -sLo /tmp/kubeseal.tar.gz "https://github.com/bitnami-labs/sealed-secrets/releases/download/v${KUBESEAL_VERSION}/kubeseal-${KUBESEAL_VERSION}-linux-amd64.tar.gz" && tar -xzf /tmp/kubeseal.tar.gz -C /tools kubeseal)
+              chmod +x /tools/kubeseal
+              echo "Tools installed: kubectl=$(ls -la /tools/kubectl) kubeseal=$(ls -la /tools/kubeseal)"
+          volumeMounts:
+            - name: tools
+              mountPath: /tools
       containers:
         - name: openclaw
           image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 18789
+          env:
+            - name: PATH
+              value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           envFrom:
             - secretRef:
                 name: setup-agent-env
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
+            - name: tools
+              mountPath: /tools
           resources:
             requests:
               cpu: 500m
@@ -74,5 +99,7 @@ spec:
           configMap:
             name: setup-agent-init
             defaultMode: 0755
+        - name: tools
+          emptyDir: {}
       imagePullSecrets:
         - name: ghcr-secret
