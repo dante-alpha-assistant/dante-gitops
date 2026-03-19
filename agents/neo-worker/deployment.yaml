@@ -19,7 +19,7 @@ spec:
         app: neo-worker
         role: agent
       annotations:
-        secret.reloader.stakater.com/reload: neo-worker-env
+        secret.reloader.stakater.com/reload: neo-worker-env,unifounder-app-secrets
     spec:
       initContainers:
       - name: init-tools
@@ -261,6 +261,8 @@ spec:
         envFrom:
         - secretRef:
             name: neo-worker-env
+        - secretRef:
+            name: unifounder-app-secrets
         volumeMounts:
         - name: data
           mountPath: /root/.openclaw
@@ -278,6 +280,8 @@ spec:
         envFrom:
         - secretRef:
             name: neo-worker-env
+        - secretRef:
+            name: unifounder-app-secrets
         env:
         - name: PATH
           value: /tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
