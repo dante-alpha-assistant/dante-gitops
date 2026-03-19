@@ -81,86 +81,51 @@ data:
       '# IDENTITY.md\n\n- **Name:** Setup Agent\n- **Emoji:** ⚙️\n- **Description:** Infrastructure setup and deployment specialist\n');
 
     // Write TOOLS.md with credential sealing instructions
-    fs.writeFileSync('/root/.openclaw/workspace/TOOLS.md', `# TOOLS.md - Setup Agent
-
-## Available CLI Tools
-- \`/tools/kubectl\` — Kubernetes CLI (installed in /tools, on PATH)
-- \`/tools/kubeseal\` — Bitnami Sealed Secrets CLI (installed in /tools, on PATH)
-- \`git\` — Git CLI (pre-installed)
-
-## Environment Variables Available
-- \`GH_TOKEN\` — GitHub PAT for cloning/pushing to dante-alpha-assistant repos
-- \`SUPABASE_SERVICE_ROLE_KEY\` — Supabase admin access
-- \`SUPABASE_MGMT_TOKEN\` — Supabase management API
-- \`OPENROUTER_API_KEY\` — AI model access
-- \`ANTHROPIC_API_KEY\` — Anthropic direct access
-
-## GitOps Repo
-- URL: https://github.com/dante-alpha-assistant/dante-gitops
-- Clone: \`git clone https://x-access-token:$GH_TOKEN@github.com/dante-alpha-assistant/dante-gitops.git /tmp/dante-gitops\`
-- Apps go in: \`apps/<slug>/\` directory
-- Agents go in: \`agents/<name>/\` directory
-
-## Credential Sealing Procedure
-
-### Action: \`setup-app-credentials\`
-When you receive a task with \`metadata.action === "setup-app-credentials"\`:
-
-1. **Parse credentials** from \`metadata.raw_env_credentials\` (raw .env text)
-2. **Clone gitops repo**: \`git clone https://x-access-token:$GH_TOKEN@github.com/dante-alpha-assistant/dante-gitops.git /tmp/dante-gitops\`
-3. **Fetch kubeseal cert**: \`kubeseal --controller-name=sealed-secrets --controller-namespace=kube-system --fetch-cert > /tmp/ss-cert.pem\`
-4. **Determine namespace**: use \`metadata.deploy_target\` config or default to \`apps\`
-5. **Create sealed secret**:
-   \`\`\`bash
-   kubectl create secret generic <app-slug>-env -n <namespace> --dry-run=client -o json \\
-     --from-literal=KEY1=value1 \\
-     --from-literal=KEY2=value2 \\
-     ... \\
-   | kubeseal --cert /tmp/ss-cert.pem --controller-name=sealed-secrets --controller-namespace=kube-system --format yaml \\
-   > /tmp/dante-gitops/apps/<app-slug>/sealed-secret.yaml
-   \`\`\`
-6. **Create kustomization.yaml** if it doesn't exist:
-   \`\`\`yaml
-   apiVersion: kustomize.config.k8s.io/v1beta1
-   kind: Kustomization
-   resources:
-     - sealed-secret.yaml
-   \`\`\`
-7. **Add to parent kustomization**: ensure \`apps/<slug>/\` is listed in \`apps/kustomization.yaml\`
-8. **Commit and push**:
-   \`\`\`bash
-   cd /tmp/dante-gitops
-   git add apps/<slug>/
-   git commit -m "feat: Add sealed credentials for <app-name>"
-   git push
-   \`\`\`
-9. **Verify**: wait ~60s, then check \`kubectl get sealedsecret <slug>-env -n <namespace>\`
-10. **Update task**: set status to \`done\` with result summary listing sealed key names
-
-### Action: \`rotate-anthropic-token\`
-When you receive a task with \`metadata.action === "rotate-anthropic-token"\`:
-
-1. **Get new token** from \`metadata.token\`
-2. **Get target agents** from \`metadata.target_agents\` array
-3. **Clone gitops repo**
-4. **Fetch kubeseal cert**
-5. **For EACH agent**:
-   a. Get current secret: \`kubectl get secret <agent>-env -n agents -o json\`
-   b. Decode all existing keys
-   c. Replace ANTHROPIC_API_KEY with the new token
-   d. Re-seal ALL keys together into sealed-secret.yaml
-   e. Write to \`agents/<agent>/sealed-secret.yaml\`
-6. **Commit and push** all changed files
-7. **Verify** pods restart via Stakater Reloader
-
-### Critical Rules
-- NEVER log or expose raw credential values in task results
-- NEVER hardcode credentials in deployment env vars
-- ALWAYS use kubeseal to encrypt secrets
-- ALWAYS overwrite the existing sealed-secret.yaml (never create custom-named files)
-- Pre-rotation check: verify existing keys are not EMPTY before re-sealing
-- Preserve ALL existing keys when rotating a single key
-`);
+    const toolsMd = [
+      '# TOOLS.md - Setup Agent',
+      '',
+      '## Available CLI Tools',
+      '- `/tools/kubectl` — Kubernetes CLI',
+      '- `/tools/kubeseal` — Bitnami Sealed Secrets CLI',
+      '- `git` — Git CLI (pre-installed)',
+      '',
+      '## Environment Variables Available',
+      '- GH_TOKEN, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_MGMT_TOKEN, OPENROUTER_API_KEY, ANTHROPIC_API_KEY',
+      '',
+      '## GitOps Repo',
+      '- URL: https://github.com/dante-alpha-assistant/dante-gitops',
+      '- Clone: git clone https://x-access-token:$GH_TOKEN@github.com/dante-alpha-assistant/dante-gitops.git /tmp/dante-gitops',
+      '- Apps go in: apps/<slug>/ directory',
+      '- Agents go in: agents/<name>/ directory',
+      '',
+      '## Action: setup-app-credentials',
+      'When you receive a task with metadata.action === "setup-app-credentials":',
+      '1. Parse credentials from metadata.raw_env_credentials (raw .env text)',
+      '2. Clone gitops repo to /tmp/dante-gitops',
+      '3. Fetch kubeseal cert: kubeseal --controller-name=sealed-secrets --controller-namespace=kube-system --fetch-cert > /tmp/ss-cert.pem',
+      '4. Determine namespace from metadata.deploy_target or default to "agents"',
+      '5. Create sealed secret:',
+      '   kubectl create secret generic <slug>-env -n <ns> --dry-run=client -o json --from-literal=KEY=val ... | kubeseal --cert /tmp/ss-cert.pem --controller-name=sealed-secrets --controller-namespace=kube-system --format yaml > /tmp/dante-gitops/apps/<slug>/sealed-secret.yaml',
+      '6. Create kustomization.yaml if missing (resources: [sealed-secret.yaml])',
+      '7. Commit and push changes',
+      '8. Verify: kubectl get sealedsecret <slug>-env -n <ns>',
+      '9. Update task status to done with sealed key names in result',
+      '',
+      '## Action: rotate-anthropic-token',
+      'When you receive a task with metadata.action === "rotate-anthropic-token":',
+      '1. Get new token from metadata.token and target agents from metadata.target_agents',
+      '2. Clone gitops repo, fetch kubeseal cert',
+      '3. For each agent: get current secret, decode keys, replace ANTHROPIC_API_KEY, re-seal ALL keys, write to agents/<name>/sealed-secret.yaml',
+      '4. Commit and push, verify pods restart via Stakater Reloader',
+      '',
+      '## Critical Rules',
+      '- NEVER log or expose raw credential values in task results',
+      '- ALWAYS use kubeseal to encrypt secrets',
+      '- ALWAYS overwrite existing sealed-secret.yaml (never create custom files)',
+      '- Pre-rotation: verify existing keys are not EMPTY before re-sealing',
+      '- Preserve ALL existing keys when rotating a single key',
+    ].join('\n');
+    fs.writeFileSync('/root/.openclaw/workspace/TOOLS.md', toolsMd);
 
     console.log([
       'Agent capabilities:',
