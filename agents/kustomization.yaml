@@ -3,9 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - neo/
-  - mu/
   - beta/
-  - flow/
   - ifra-worker/
   - setup-agent/
   - eliseo/
