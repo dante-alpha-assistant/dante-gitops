@@ -66,129 +66,8 @@ data:
     
     // Write agent identity
     fs.writeFileSync('/root/.openclaw/workspace/IDENTITY.md',
-      '# IDENTITY.md
-
-- **Name:** Setup Agent
-- **Emoji:** ⚙️
-- **Description:** Infrastructure setup and deployment specialist
-');
-    
-    // Write TOOLS.md with credential sealing instructions
-    const toolsMd = [
-      '# TOOLS.md - Setup Agent',
-      '',
-      '## Available CLI Tools',
-      '- `/tools/kubectl` — Kubernetes CLI',
-      '- `/tools/kubeseal` — Bitnami Sealed Secrets CLI',
-      '- `git` — Git CLI (pre-installed)',
-      '',
-      '## Environment Variables Available',
-      '- GH_TOKEN, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_MGMT_TOKEN, OPENROUTER_API_KEY, ANTHROPIC_API_KEY',
-      '',
-      '## GitOps Repo',
-      '- URL: https://github.com/dante-alpha-assistant/dante-gitops',
-      '- Clone: git clone https://x-access-token:$GH_TOKEN@github.com/dante-alpha-assistant/dante-gitops.git /tmp/dante-gitops',
-      '- Apps go in: apps/<slug>/ directory',
-      '- Agents go in: agents/<name>/ directory',
-      '',
-      '## Action: setup-app-credentials',
-      'When you receive a task with metadata.action === "setup-app-credentials":',
-      '1. Parse credentials from metadata.raw_env_credentials (raw .env text)',
-      '2. Clone gitops repo to /tmp/dante-gitops',
-      '3. Fetch kubeseal cert: kubeseal --controller-name=sealed-secrets --controller-namespace=kube-system --fetch-cert > /tmp/ss-cert.pem',
-      '4. Determine namespace from metadata.deploy_target or default to "agents"',
-      '5. Create sealed secret:',
-      '   kubectl create secret generic <slug>-env -n <ns> --dry-run=client -o json --from-literal=KEY=val ... | kubeseal --cert /tmp/ss-cert.pem --controller-name=sealed-secrets --controller-namespace=kube-system --format yaml > /tmp/dante-gitops/apps/<slug>/sealed-secret.yaml',
-      '6. Create kustomization.yaml if missing (resources: [sealed-secret.yaml])',
-      '7. Commit and push changes',
-      '8. Verify: kubectl get sealedsecret <slug>-env -n <ns>',
-      '9. Update task status to done with sealed key names in result',
-      '',
-      '## Action: rotate-anthropic-token',
-      'When you receive a task with metadata.action === "rotate-anthropic-token":',
-      '1. Get new token from metadata.token and target agents from metadata.target_agents',
-      '2. Clone gitops repo, fetch kubeseal cert',
-      '3. For each agent: get current secret, decode keys, replace ANTHROPIC_API_KEY, re-seal ALL keys, write to agents/<name>/sealed-secret.yaml',
-      '4. Commit and push, verify pods restart via Stakater Reloader',
-      '',
-      '## Critical Rules',
-      '- NEVER log or expose raw credential values in task results',
-      '- ALWAYS use kubeseal to encrypt secrets',
-      '- ALWAYS overwrite existing sealed-secret.yaml (never create custom files)',
-      '- Pre-rotation: verify existing keys are not EMPTY before re-sealing',
-      '- Preserve ALL existing keys when rotating a single key',
-    ].join('
-');
-    fs.writeFileSync('/root/.openclaw/workspace/TOOLS.md', toolsMd);
-    
-    console.log([
-      'Agent capabilities:',
-      '- Vercel deployments and project setup',
-      '- Database schema initialization',
-      '- Environment variable configuration',
-      '- K8s resource provisioning',
-      '- Credential sealing via kubeseal',
-      '- GitOps repo management',
-      '- Primary model: claude-sonnet-4-5 via OpenRouter (no token expiry)',
-      '- Handle setup task type exclusively'
-    ].join('
-'));
-    
-    console.log('setup-agent config written OK');
-    
-
-    console.log('=== setup-agent init config ===');
-
-    const e = process.env;
-
-    // Ensure directories exist
-    fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
-    fs.mkdirSync('/root/.openclaw/workspace/skills', { recursive: true });
-    fs.mkdirSync('/root/.openclaw/workspace/credentials', { recursive: true });
-    fs.mkdirSync('/root/.openclaw/agents/main/agent', { recursive: true });
-
-    // Write openclaw.json — no js-yaml dependency needed, pure JSON
-    const config = {
-      gateway: {
-        port: 18789,
-        mode: 'local',
-        bind: 'lan',
-        auth: { mode: 'token', token: e.OPENCLAW_GATEWAY_TOKEN || 'setup-agent-gw-tok-2026' },
-        tools: { allow: ['sessions_spawn','sessions_send','sessions_list','sessions_history','session_status','cron'] },
-        controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
-      },
-      agents: {
-        defaults: {
-          model: { primary: 'anthropic/claude-sonnet-4-5' },
-          workspace: '/root/.openclaw/workspace',
-          compaction: { mode: 'safeguard' },
-          maxConcurrent: 8,
-          sandbox: { browser: { enabled: false } },
-          subagents: { maxConcurrent: 4 },
-          heartbeat: { every: '5m' }
-        }
-      },
-      hooks: {
-        enabled: true,
-        token: 'setup-agent-hooks-tok-2026',
-        allowRequestSessionKey: true,
-        defaultSessionKey: 'hook:default',
-        allowedSessionKeyPrefixes: ['hook:']
-      },
-      tools: { sessions: { visibility: 'all' } }
-    };
-    fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
-
-    // Delete persisted auth-profiles.json and models.json from PVC so OpenClaw auto-configures
-    // Anthropic OAuth from env vars (ANTHROPIC_API_KEY / ANTHROPIC_REFRESH_TOKEN / ANTHROPIC_TOKEN_EXPIRES).
-    // A stale static auth-profile bypasses the OAuth refresh mechanism.
-    try { fs.unlinkSync('/root/.openclaw/agents/main/agent/auth-profiles.json'); } catch(e) {}
-    try { fs.unlinkSync('/root/.openclaw/agents/main/agent/models.json'); } catch(e) {}
-
-    // Write agent identity
-    fs.writeFileSync('/root/.openclaw/workspace/IDENTITY.md',
       '# IDENTITY.md\n\n- **Name:** Setup Agent\n- **Emoji:** ⚙️\n- **Description:** Infrastructure setup and deployment specialist\n');
-
+    
     // Write TOOLS.md with credential sealing instructions
     const toolsMd = [
       '# TOOLS.md - Setup Agent',
@@ -235,7 +114,7 @@ data:
       '- Preserve ALL existing keys when rotating a single key',
     ].join('\n');
     fs.writeFileSync('/root/.openclaw/workspace/TOOLS.md', toolsMd);
-
+    
     console.log([
       'Agent capabilities:',
       '- Vercel deployments and project setup',
@@ -244,8 +123,9 @@ data:
       '- K8s resource provisioning',
       '- Credential sealing via kubeseal',
       '- GitOps repo management',
-      '- Primary model: claude-sonnet-4-5 via Anthropic (OpenRouter fallback available)',
+      '- Primary model: claude-sonnet-4-5 via OpenRouter (no token expiry)',
       '- Handle setup task type exclusively'
     ].join('\n'));
-
+    
     console.log('setup-agent config written OK');
+    
