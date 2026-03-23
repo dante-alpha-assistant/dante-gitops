@@ -109,12 +109,12 @@ spec:
             - name: BETA_GATEWAY_TOKEN
               value: "beta-gw-tok-2026"
             - name: FLOW_GATEWAY_TOKEN
+              value: "flow-gw-tok-2026"
             - name: VERCEL_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: task-dispatcher-env
                   key: VERCEL_TOKEN
-              value: "flow-gw-tok-2026"
           resources:
             requests:
               cpu: 50m
