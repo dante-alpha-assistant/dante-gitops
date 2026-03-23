@@ -129,3 +129,30 @@ data:
     
     console.log('setup-agent config written OK');
     
+    // Write HEARTBEAT.md with simple inline curl commands (no script files)
+    // Extract SUPABASE keys from env
+    const SUPABASE_URL = 'https://lessxkxujvcmublgwdaa.supabase.co';
+    const SUPABASE_KEY = e.SUPABASE_SERVICE_ROLE_KEY || '';
+    
+    const heartbeatMd = `# HEARTBEAT.md — setup-agent
+    
+    Every heartbeat, run these steps using the exec tool directly (do NOT write scripts to files).
+    
+    ## Step 1: Upsert agent card
+    Run this exact command with exec:
+    \`\`\`
+    curl -s -X POST "${SUPABASE_URL}/rest/v1/agent_cards" -H "apikey: ${SUPABASE_KEY}" -H "Authorization: Bearer ${SUPABASE_KEY}" -H "Content-Type: application/json" -H "Prefer: resolution=merge-duplicates" -d '[{"id":"setup-agent","name":"setup-agent","capabilities":["setup"],"task_types":["setup"],"max_capacity":2,"status":"online","endpoint_url":"http://setup-agent.agents.svc.cluster.local:18789","auth_token_ref":"setup-agent-gw-tok-2026","avatar":"🧰","description":"Environment setup, credentials wiring, and deployment bootstrap","tier":"worker","parent_agent":"Neo","role":"Setup Worker","available_credentials":["GH_TOKEN","SUPABASE_SERVICE_ROLE_KEY","SUPABASE_MGMT_TOKEN","VERCEL_TOKEN"]}]'
+    \`\`\`
+    
+    ## Step 2: Mark healthy
+    Run this exact command with exec (use current UTC time for last_heartbeat):
+    \`\`\`
+    curl -s -X PATCH "${SUPABASE_URL}/rest/v1/agent_cards?id=eq.setup-agent" -H "apikey: ${SUPABASE_KEY}" -H "Authorization: Bearer ${SUPABASE_KEY}" -H "Content-Type: application/json" -d '{"status":"online","last_heartbeat":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","metadata":{"model":"openrouter/anthropic/claude-sonnet-4-5","healthy":true}}'
+    \`\`\`
+    
+    If both commands succeed (HTTP 200/201), reply HEARTBEAT_OK.
+    If SUPABASE_KEY is empty, skip Supabase steps and reply HEARTBEAT_OK.
+    `;
+    fs.writeFileSync('/root/.openclaw/workspace/HEARTBEAT.md', heartbeatMd);
+    console.log('HEARTBEAT.md written');
+    
