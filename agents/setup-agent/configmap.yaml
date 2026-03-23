@@ -49,20 +49,9 @@ data:
     };
     fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
 
-    // Write auth-profiles — OpenRouter token + Anthropic direct API key
-    const authProfiles = {
-      'openrouter:default': {
-        type: 'api_key',
-        provider: 'openrouter',
-        key: e.OPENROUTER_API_KEY || ''
-      },
-      'anthropic:default': {
-        type: 'api_key',
-        provider: 'anthropic',
-        key: e.ANTHROPIC_API_KEY || ''
-      }
-    };
-    fs.writeFileSync('/root/.openclaw/agents/main/agent/auth-profiles.json', JSON.stringify(authProfiles, null, 2));
+    // Note: Do NOT write auth-profiles.json — let OpenClaw auto-configure Anthropic OAuth
+    // from ANTHROPIC_API_KEY / ANTHROPIC_REFRESH_TOKEN / ANTHROPIC_TOKEN_EXPIRES env vars.
+    // Writing a static auth-profile would bypass the OAuth refresh mechanism.
 
     // Write agent identity
     fs.writeFileSync('/root/.openclaw/workspace/IDENTITY.md',
