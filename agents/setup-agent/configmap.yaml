@@ -49,9 +49,11 @@ data:
     };
     fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
 
-    // Note: Do NOT write auth-profiles.json — let OpenClaw auto-configure Anthropic OAuth
-    // from ANTHROPIC_API_KEY / ANTHROPIC_REFRESH_TOKEN / ANTHROPIC_TOKEN_EXPIRES env vars.
-    // Writing a static auth-profile would bypass the OAuth refresh mechanism.
+    // Delete persisted auth-profiles.json and models.json from PVC so OpenClaw auto-configures
+    // Anthropic OAuth from env vars (ANTHROPIC_API_KEY / ANTHROPIC_REFRESH_TOKEN / ANTHROPIC_TOKEN_EXPIRES).
+    // A stale static auth-profile bypasses the OAuth refresh mechanism.
+    try { fs.unlinkSync('/root/.openclaw/agents/main/agent/auth-profiles.json'); } catch(e) {}
+    try { fs.unlinkSync('/root/.openclaw/agents/main/agent/models.json'); } catch(e) {}
 
     // Write agent identity
     fs.writeFileSync('/root/.openclaw/workspace/IDENTITY.md',
