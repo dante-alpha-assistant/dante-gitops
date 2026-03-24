@@ -59,6 +59,7 @@ spec:
                 agents: {
                   defaults: {
                     model: { primary: "openrouter/moonshotai/kimi-k2.5" },
+                    models: { "openrouter/moonshotai/kimi-k2.5": {} },
                     workspace: "/root/.openclaw/workspace",
                     compaction: { mode: "safeguard" },
                     maxConcurrent: 4,
