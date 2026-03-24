@@ -46,7 +46,6 @@ spec:
                   }
                 },
                 models: {
-                  allowed: ["openrouter/moonshotai/kimi-k2.5"],
                   providers: {
                     openrouter: {
                       baseUrl: "https://openrouter.ai/api/v1",
@@ -69,12 +68,40 @@ spec:
                 tools: { sessions: { visibility: "all" } }
               };
               fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
+              fs.mkdirSync('/root/.openclaw/workspace/skills', { recursive: true });
               fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
               fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
+              // Write coding-agent skill marker so openclaw knows to use codex
+              const skillDir = '/root/.openclaw/workspace/skills/coding-agent';
+              if (!fs.existsSync(skillDir)) {
+                fs.mkdirSync(skillDir, { recursive: true });
+                fs.writeFileSync(skillDir + '/SKILL.md', '# coding-agent\nDelegate coding tasks to Codex CLI.\n');
+              }
               console.log('Eliseo config written OK');
           envFrom:
             - secretRef:
                 name: eliseo-env
+          volumeMounts:
+            - name: data
+              mountPath: /root/.openclaw
+        - name: install-codex
+          image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+          command: ["sh", "-c"]
+          args:
+            - |
+              if ! which codex > /dev/null 2>&1; then
+                npm install -g @openai/codex 2>&1 | tail -3
+                echo "Codex installed: $(codex --version 2>/dev/null || echo 'done')"
+              else
+                echo "Codex already installed: $(codex --version)"
+              fi
+              # Copy full coding-agent skill from openclaw built-ins if available
+              SKILL_SRC="/usr/local/lib/node_modules/openclaw/skills/coding-agent"
+              SKILL_DST="/root/.openclaw/workspace/skills/coding-agent"
+              if [ -d "$SKILL_SRC" ] && [ ! -f "$SKILL_DST/SKILL.md" ]; then
+                cp -r "$SKILL_SRC" "$SKILL_DST"
+                echo "Skill copied from built-ins"
+              fi
           volumeMounts:
             - name: data
               mountPath: /root/.openclaw
