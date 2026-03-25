@@ -24,7 +24,7 @@ data:
         mode: 'local',
         bind: 'lan',
         auth: { mode: 'token', token: e.OPENCLAW_GATEWAY_TOKEN || 'setup-agent-gw-tok-2026' },
-        tools: { allow: ['sessions_spawn','sessions_send','sessions_list','sessions_history','session_status','cron'] },
+        tools: { allow: ['sessions_spawn','sessions_send','sessions_list','sessions_history','session_status','cron','exec','web_fetch'] },
         controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
       },
       agents: {
@@ -34,6 +34,7 @@ data:
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
           sandbox: { browser: { enabled: false } },
+          tools: { exec: { host: 'sandbox' } },
           subagents: { maxConcurrent: 4 },
           heartbeat: { every: '5m' }
         }
