@@ -45,7 +45,7 @@ data:
         defaultSessionKey: 'hook:default',
         allowedSessionKeyPrefixes: ['hook:']
       },
-      tools: { sessions: { visibility: 'all' }, exec: { host: 'gateway', ask: 'off' } }
+      tools: { sessions: { visibility: 'all' }, exec: { host: 'gateway', ask: 'off', security: 'full' } }
     };
     fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
     
