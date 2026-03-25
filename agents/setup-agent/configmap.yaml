@@ -29,7 +29,7 @@ data:
       },
       agents: {
         defaults: {
-          model: { primary: 'openrouter/moonshotai/kimi-k2.5' },
+          model: { primary: 'moonshotai/kimi-k2.5' },
           workspace: '/root/.openclaw/workspace',
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
@@ -147,7 +147,7 @@ data:
     ## Step 2: Mark healthy
     Run this exact command with exec (use current UTC time for last_heartbeat):
     \`\`\`
-    curl -s -X PATCH "${SUPABASE_URL}/rest/v1/agent_cards?id=eq.setup-agent" -H "apikey: ${SUPABASE_KEY}" -H "Authorization: Bearer ${SUPABASE_KEY}" -H "Content-Type: application/json" -d '{"status":"online","last_heartbeat":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","metadata":{"model":"openrouter/moonshotai/kimi-k2.5","healthy":true}}'
+    curl -s -X PATCH "${SUPABASE_URL}/rest/v1/agent_cards?id=eq.setup-agent" -H "apikey: ${SUPABASE_KEY}" -H "Authorization: Bearer ${SUPABASE_KEY}" -H "Content-Type: application/json" -d '{"status":"online","last_heartbeat":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","metadata":{"model":"moonshotai/kimi-k2.5","healthy":true}}'
     \`\`\`
     
     If both commands succeed (HTTP 200/201), reply HEARTBEAT_OK.

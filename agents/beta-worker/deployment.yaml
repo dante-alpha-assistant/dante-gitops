@@ -98,7 +98,7 @@ spec:
           , name: \"kimi-k2.5\", api: \"openai-completions\", reasoning: true, input:\
           \ [\"text\",\"image\"], cost: { input: 0.45, output: 2.25 }, contextWindow:\
           \ 262144, maxTokens: 16384 }\n        ]\n      }\n    }\n  },\n  agents:\
-          \ {\n    defaults: {\n      model: { primary: \"openrouter/moonshotai/kimi-k2.5\"\
+          \ {\n    defaults: {\n      model: { primary: \"moonshotai/kimi-k2.5\"\
           \ },\n      workspace: \"/root/.openclaw/workspace\",\n      compaction:\
           \ { mode: \"safeguard\" },\n      maxConcurrent: 2,\n      sandbox: { browser: { enabled: true, headless: true } },\n    }\n  },\n  hooks:\
           \ { enabled: true, token: e.HOOKS_TOKEN || \"beta-worker-hooks-tok-2026\"\
