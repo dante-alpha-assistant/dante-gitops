@@ -34,7 +34,6 @@ data:
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
           sandbox: { browser: { enabled: false } },
-          tools: { exec: { host: 'sandbox' } },
           subagents: { maxConcurrent: 4 },
           heartbeat: { every: '5m' }
         }
@@ -46,7 +45,7 @@ data:
         defaultSessionKey: 'hook:default',
         allowedSessionKeyPrefixes: ['hook:']
       },
-      tools: { sessions: { visibility: 'all' } }
+      tools: { sessions: { visibility: 'all' }, exec: { host: 'sandbox' } }
     };
     fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
     
