@@ -29,7 +29,7 @@ data:
       },
       agents: {
         defaults: {
-          model: { primary: 'anthropic/claude-sonnet-4-5' },
+          model: { primary: 'openrouter/anthropic/claude-sonnet-4-5' },
           workspace: '/root/.openclaw/workspace',
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
