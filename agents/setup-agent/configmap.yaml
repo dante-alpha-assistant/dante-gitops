@@ -29,8 +29,8 @@ data:
       },
       agents: {
         defaults: {
-          model: { primary: 'openrouter/anthropic/claude-3-5-haiku-20241022' },
-          models: { 'openrouter/anthropic/claude-3-5-haiku-20241022': { params: { max_tokens: 4096 } } },
+          model: { primary: 'openrouter/anthropic/claude-3-5-haiku' },
+          models: { 'openrouter/anthropic/claude-3-5-haiku': { params: { max_tokens: 4096 } } },
           workspace: '/root/.openclaw/workspace',
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
