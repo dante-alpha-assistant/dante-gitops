@@ -29,7 +29,7 @@ data:
       },
       agents: {
         defaults: {
-          model: { primary: 'anthropic/claude-3-5-haiku' },
+          model: { primary: 'anthropic/claude-3-5-haiku-20241022' },
           workspace: '/root/.openclaw/workspace',
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
