@@ -29,7 +29,7 @@ data:
       },
       agents: {
         defaults: {
-          model: { primary: 'openrouter/anthropic/claude-3-5-haiku', maxTokens: 6000 },
+          model: { primary: 'anthropic/claude-3-5-haiku' },
           workspace: '/root/.openclaw/workspace',
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
@@ -49,10 +49,15 @@ data:
     };
     fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
     
-    // Write auth-profiles.json using OpenRouter (no expiry issues)
+    // Write auth-profiles.json - Anthropic direct (OAuth valid ~1yr) + OpenRouter fallback
     const authProfiles = {
       version: 1,
       profiles: {
+        "anthropic:default": {
+          type: "token",
+          provider: "anthropic",
+          token: e.ANTHROPIC_API_KEY
+        },
         "openrouter:default": {
           type: "token",
           provider: "openrouter",
