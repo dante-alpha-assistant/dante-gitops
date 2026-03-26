@@ -29,7 +29,7 @@ data:
       },
       agents: {
         defaults: {
-          model: { primary: 'openrouter/anthropic/claude-3-5-haiku' },
+          model: { primary: 'openrouter/anthropic/claude-3-5-haiku', maxTokens: 6000 },
           workspace: '/root/.openclaw/workspace',
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
