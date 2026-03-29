@@ -12,3 +12,4 @@ resources:
   - worker-template/
   - research-worker/
   - neo-chat-worker/
+  - geo-worker/

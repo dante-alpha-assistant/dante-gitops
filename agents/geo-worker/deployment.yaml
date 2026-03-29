@@ -1,0 +1,181 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: geo-worker
+  namespace: agents
+  labels:
+    app: geo-worker
+    role: agent
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: geo-worker
+  template:
+    metadata:
+      labels:
+        app: geo-worker
+        role: agent
+      annotations:
+        secret.reloader.stakater.com/reload: geo-worker-env
+    spec:
+      initContainers:
+      - name: init-config
+        image: node:22-bookworm-slim
+        command:
+        - node
+        - -e
+        - |
+          const fs = require('fs');
+          const e = process.env;
+          const config = {
+            gateway: {
+              port: 18789,
+              mode: "local",
+              bind: "lan",
+              auth: { mode: "token", token: e.OPENCLAW_GATEWAY_TOKEN || "" },
+              http: { endpoints: { chatCompletions: { enabled: true } } },
+              tools: { allow: ["Read","Write","Edit","exec","web_fetch","web_search","browser","image","sessions_spawn","sessions_send","sessions_list","sessions_history","session_status","cron"] },
+              controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
+            },
+            models: {
+              providers: {
+                openrouter: {
+                  baseUrl: "https://openrouter.ai/api/v1",
+                  apiKey: e.OPENROUTER_API_KEY || "",
+                  models: [
+                    { id: "openai/gpt-5.4", name: "gpt-5.4", api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 2, output: 8, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 },
+                    { id: "moonshotai/kimi-k2.5", name: "kimi-k2.5", api: "openai-completions", reasoning: true, input: ["text","image"], cost: { input: 0.45, output: 2.25, cacheRead: 0.07, cacheWrite: 0 }, contextWindow: 262144, maxTokens: 8192 },
+                    { id: "anthropic/claude-sonnet-4-6", name: "claude-sonnet-4-6", api: "openai-completions", reasoning: false, input: ["text","image"], cost: { input: 3, output: 15, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 16384 }
+                  ]
+                }
+              }
+            },
+            agents: {
+              defaults: {
+                model: { primary: "openai/gpt-5.4" },
+                workspace: "/root/.openclaw/workspace",
+                compaction: { mode: "safeguard" },
+                maxConcurrent: 4,
+                sandbox: { browser: { enabled: true, headless: true } },
+                subagents: { maxConcurrent: 8 },
+                heartbeat: { every: "5m" }
+              }
+            },
+            hooks: { enabled: true, token: "geo-worker-hooks-tok-2026", allowRequestSessionKey: true, defaultSessionKey: "hook:default", allowedSessionKeyPrefixes: ["hook:"] },
+            tools: { sessions: { visibility: "all" } }
+          };
+          fs.mkdirSync('/root/.openclaw/workspace', { recursive: true });
+          fs.mkdirSync('/root/.openclaw/skills', { recursive: true });
+          fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
+
+          // SOUL.md
+          fs.writeFileSync('/root/.openclaw/workspace/SOUL.md', [
+            '# SOUL.md - geo-worker',
+            '',
+            'You are **geo-worker**, a headless GEO (Generative Engine Optimization) task execution agent.',
+            'You receive tasks from BullMQ via the Unifounder task engine and execute them autonomously.',
+            '',
+            '## Core Rules',
+            '- You execute GEO engine tasks: crawl audits, baseline hydration, surface mapping, answer asset generation, evaluation, publishing.',
+            '- You are methodical and thorough. Every task produces artifacts stored back to the engine.',
+            '- You follow the GEO spec: answerability, citeability, originality, technical correctness, freshness.',
+            '- You NEVER skip quality checks. Every artifact must be validated before marking complete.',
+            '- You report progress via task status updates.',
+            '',
+            '## Environment',
+            '- Model: openrouter/gpt-5.4',
+            '- Redis: redis://redis.dev.svc.cluster.local:6379 (BullMQ queue)',
+            '- Workspace: /root/.openclaw/workspace/',
+          ].join('\n'));
+
+          // AGENTS.md
+          fs.writeFileSync('/root/.openclaw/workspace/AGENTS.md', [
+            '# AGENTS.md - geo-worker',
+            '',
+            '## Every Session',
+            '1. Read SOUL.md',
+            '2. Execute the dispatched task following GEO quality standards',
+            '3. Store artifacts and update task status',
+          ].join('\n'));
+
+          // HEARTBEAT.md — agent card self-update
+          const agentId = 'geo-worker';
+          const sbUrl = 'https://lessxkxujvcmublgwdaa.supabase.co';
+          const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI';
+          const heartbeat = [
+            '# HEARTBEAT.md',
+            '',
+            'Run these steps IN ORDER every heartbeat.',
+            '',
+            '## Step 1: Check current status',
+            '',
+            '```bash',
+            `STATUS=$(curl -s "${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}&select=status" \\`,
+            `  -H "apikey: ${sbKey}" \\`,
+            `  -H "Authorization: Bearer ${sbKey}" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)`,
+            'echo "Current status: $STATUS"',
+            '```',
+            '',
+            'If status is "disabled", reply HEARTBEAT_OK.',
+            '',
+            '## Step 2: Update agent card',
+            '',
+            '```bash',
+            `curl -s -X PATCH "${sbUrl}/rest/v1/agent_cards?id=eq.${agentId}" \\`,
+            `  -H "apikey: ${sbKey}" \\`,
+            `  -H "Authorization: Bearer ${sbKey}" \\`,
+            '  -H "Content-Type: application/json" \\',
+            `  -d '{"status":"online","last_heartbeat":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","metadata":{"model_health":"ok","model_health_at":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}}'`,
+            '```',
+            '',
+            'Reply HEARTBEAT_OK.',
+          ].join('\n');
+          fs.writeFileSync('/root/.openclaw/workspace/HEARTBEAT.md', heartbeat);
+
+          console.log('geo-worker config written OK');
+        envFrom:
+        - secretRef:
+            name: geo-worker-env
+        volumeMounts:
+        - name: data
+          mountPath: /root/.openclaw
+      containers:
+      - name: openclaw
+        image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
+        ports:
+        - containerPort: 18789
+        envFrom:
+        - secretRef:
+            name: geo-worker-env
+        volumeMounts:
+        - name: data
+          mountPath: /root/.openclaw
+        resources:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          tcpSocket:
+            port: 18789
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+        readinessProbe:
+          tcpSocket:
+            port: 18789
+          initialDelaySeconds: 60
+          periodSeconds: 5
+          timeoutSeconds: 5
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: geo-worker-data
+      imagePullSecrets:
+      - name: ghcr-secret
