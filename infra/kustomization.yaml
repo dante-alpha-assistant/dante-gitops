@@ -6,3 +6,4 @@ resources:
   - ../base/redis/
   - secrets-sealer/
   - reloader
+  - connector-gateway/deployment.yaml

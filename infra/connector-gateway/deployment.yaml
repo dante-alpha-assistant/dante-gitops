@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: connector-gateway
+  namespace: infra
+  labels:
+    app: connector-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: connector-gateway
+  template:
+    metadata:
+      labels:
+        app: connector-gateway
+    spec:
+      containers:
+        - name: gateway
+          image: localhost/connector-gateway:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: connector-gateway-env
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: connector-gateway
+  namespace: infra
+spec:
+  selector:
+    app: connector-gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
