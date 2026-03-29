@@ -30,7 +30,7 @@ data:
       agents: {
         defaults: {
           model: { primary: 'google/gemini-2.0-flash-001' },
-          models: { 'google/gemini-2.0-flash-001': { maxOutputTokens: 4096 } },
+          models: { 'google/gemini-2.0-flash-001': { params: { max_tokens: 4096 } } },
           workspace: '/root/.openclaw/workspace',
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
@@ -41,7 +41,7 @@ data:
       },
       models: {
         providers: {
-          'google-genai': { apiKey: e.GOOGLE_API_KEY }
+          'google-genai': { apiKey: e.GOOGLE_API_KEY, baseUrl: 'https://generativelanguage.googleapis.com/v1beta', models: ['google/gemini-2.0-flash-001'] }
         }
       },
       hooks: {
