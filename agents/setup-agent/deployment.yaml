@@ -59,7 +59,7 @@ spec:
       containers:
         - name: openclaw
           image: ghcr.io/dante-alpha-assistant/openclaw-agent:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 18789
           env:
