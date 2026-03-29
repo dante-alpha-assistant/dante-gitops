@@ -65,6 +65,10 @@ spec:
           env:
             - name: PATH
               value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            - name: ANTHROPIC_REFRESH_TOKEN
+              value: ""
+            - name: ANTHROPIC_TOKEN_EXPIRES
+              value: ""
           envFrom:
             - secretRef:
                 name: setup-agent-env
