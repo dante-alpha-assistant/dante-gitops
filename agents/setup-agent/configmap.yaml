@@ -29,8 +29,8 @@ data:
       },
       agents: {
         defaults: {
-          model: { primary: 'google/gemini-2.0-flash-001' },
-          models: { 'google/gemini-2.0-flash-001': { params: { max_tokens: 4096 } } },
+          model: { primary: 'openrouter/google/gemini-2.0-flash-exp:free' },
+          models: { 'openrouter/google/gemini-2.0-flash-exp:free': { params: { max_tokens: 4096 } } },
           workspace: '/root/.openclaw/workspace',
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
