@@ -112,7 +112,7 @@ spec:
           \ create a feature branch, never commit to main directly.',\n  '- ALWAYS\
           \ create a PR with a clear title and description.',\n  '- ALWAYS update\
           \ task status when done (done on success, failed on error).',\n  '',\n \
-          \ '## Coding via Sub-Agent Delegation (MANDATORY)\\n- NEVER use codex CLI or claude CLI directly — they are broken on K8s pods.\\n- For ALL coding work, use sessions_spawn with runtime=subagent and mode=run.\\n- Sub-agents inherit your auth and tools. They do the actual file edits.\\n- You orchestrate: clone repo, create branch, spawn sub-agent, verify build, create PR.\\n- If sub-agent fails, retry once with clearer prompt. If it fails again, mark task failed.\\n\\n## Progress Comments (CRITICAL - prevents idle timeout!)\\n\\nYou MUST post progress comments to the task at every stage.\\nThe dispatcher monitors activity. 15min without a Supabase write = session killed.\\nComments reset the idle timer.\\n\\n### Mandatory checkpoints:\\n1. Cloning repo... - right after you start (within 30s)\\n2. Created branch feat/xxx - after creating feature branch\\n3. Spawning sub-agent... - before launching coding sub-agent\\n4. Sub-agent working... - every 5min heartbeat while agent runs\\n5. Running pre-push checks... - before node --check / npm run build\\n6. Pushed to branch, creating PR... - after git push\\n7. PR created: URL - final comment with link\\n\\nNEVER go more than 5 minutes without a progress comment.\\nPost via curl to Supabase rest/v1/task_comments with task_id, author=ifra-worker, author_type=agent.\\n\\n## Pre-Push Checklist (NON-NEGOTIABLE)\\n- node --check on every modified server-side .js file\\n- npm run build for frontend projects\\n- Never push code that does not pass syntax checks\\n\\n## Environment',\n  '- GH_TOKEN is available as an env var for git operations',\n\
+          \ '## Coding via Coding via codex-conductor (MANDATORY)\\n- For ALL coding work, read and follow the codex-conductor skill at skills/codex-conductor/SKILL.md\\n- ALWAYS use codex-conductor to orchestrate Codex 5.3 (codex --model codex-5.3 --full-auto exec)\\n- codex-conductor enforces spec-driven dev, stage gates, progress tracking, pre-push checks\\n- You orchestrate: read spec, run codex-conductor, verify build, create PR\\n- If Codex fails, retry once with clearer prompt. If it fails again, mark task failed.\\n\\n## Progress Comments (CRITICAL - prevents idle timeout!)\\n\\nYou MUST post progress comments to the task at every stage.\\nThe dispatcher monitors activity. 15min without a Supabase write = session killed.\\nComments reset the idle timer.\\n\\n### Mandatory checkpoints:\\n1. Cloning repo... - right after you start (within 30s)\\n2. Created branch feat/xxx - after creating feature branch\\n3. Spawning sub-agent... - before launching coding sub-agent\\n4. Sub-agent working... - every 5min heartbeat while agent runs\\n5. Running pre-push checks... - before node --check / npm run build\\n6. Pushed to branch, creating PR... - after git push\\n7. PR created: URL - final comment with link\\n\\nNEVER go more than 5 minutes without a progress comment.\\nPost via curl to Supabase rest/v1/task_comments with task_id, author=ifra-worker, author_type=agent.\\n\\n## Pre-Push Checklist (NON-NEGOTIABLE)\\n- node --check on every modified server-side .js file\\n- npm run build for frontend projects\\n- Never push code that does not pass syntax checks\\n\\n## Environment',\n  '- GH_TOKEN is available as an env var for git operations',\n\
           \  '- Git user: Neo <dante-neo-assistant@proton.me>',\n  '- Workspace: /root/.openclaw/workspace/',\n\
           ].join('\\n'));\n\n// AGENTS.md\nconst agentsPath = '/root/.openclaw/workspace/AGENTS.md';\n\
           fs.writeFileSync(agentsPath, [\n  '# AGENTS.md - ifra-worker',\n  '',\n\
@@ -159,7 +159,20 @@ spec:
           \ {};\n  existing.lastGood.anthropic = 'anthropic:default';\n  fs.writeFileSync(authPath,\
           \ JSON.stringify(existing, null, 2));\n  console.log('auth-profiles.json\
           \ written from ANTHROPIC_API_KEY');\n}\n\nconsole.log('Ifra-worker config\
-          \ + SOUL.md + coding-task skill written OK');\n"
+          \ + SOUL.md + coding-task skill written OK');\n\
+          \n// --- Install codex-conductor skill from ClawHub ---\n\
+          const { execSync } = require('child_process');\n\
+          const codexConductorDir = '/root/.openclaw/workspace/skills/codex-conductor';\n\
+          if (!fs.existsSync(codexConductorDir + '/SKILL.md')) {\n\
+          \  try {\n\
+          \    execSync('npx clawhub install codex-conductor', { stdio: 'inherit', timeout: 60000 });\n\
+          \    console.log('codex-conductor skill installed OK');\n\
+          \  } catch(e) {\n\
+          \    console.error('codex-conductor install failed:', e.message);\n\
+          \  }\n\
+          } else {\n\
+          \  console.log('codex-conductor skill already present');\n\
+          }\n"
         envFrom:
         - secretRef:
             name: ifra-worker-env
