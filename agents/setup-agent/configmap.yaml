@@ -36,7 +36,7 @@ data:
           maxConcurrent: 8,
           sandbox: { browser: { enabled: false } },
           subagents: { maxConcurrent: 4 },
-          heartbeat: { every: '5m' }
+          heartbeat: { every: '15m' }
         }
       },
       hooks: {
