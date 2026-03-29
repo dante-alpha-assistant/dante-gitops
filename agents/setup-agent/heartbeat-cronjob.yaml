@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: setup-agent-heartbeat
+  namespace: agents
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: heartbeat
+            image: curlimages/curl:8.5.0
+            imagePullPolicy: IfNotPresent
+            command:
+            - sh
+            - -c
+            - |
+              TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+              SUPA_URL="https://lessxkxujvcmublgwdaa.supabase.co"
+              KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI"
+              curl -sf -X POST "$SUPA_URL/rest/v1/agent_cards" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -H "Prefer: resolution=merge-duplicates" -d '[{"id":"setup-agent","name":"setup-agent","capabilities":["setup"],"task_types":["setup"],"max_capacity":2,"status":"online","endpoint_url":"http://setup-agent.agents.svc.cluster.local:18789","auth_token_ref":"setup-agent-gw-tok-2026","avatar":"🧰","tier":"worker"}]'
+              curl -sf -X PATCH "$SUPA_URL/rest/v1/agent_cards?id=eq.setup-agent" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d "{\"status\":\"online\",\"last_heartbeat\":\"$TS\",\"metadata\":{\"healthy\":true}}"
+              echo "Heartbeat sent: $TS"
