@@ -29,8 +29,8 @@ data:
       },
       agents: {
         defaults: {
-          model: { primary: 'anthropic/claude-haiku-4-5' },
-          models: { 'anthropic/claude-haiku-4-5': { params: { max_tokens: 4096 } } },
+          model: { primary: 'google/gemini-2.0-flash-001' },
+          models: { 'google/gemini-2.0-flash-001': { maxOutputTokens: 4096 } },
           workspace: '/root/.openclaw/workspace',
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
@@ -39,7 +39,15 @@ data:
           heartbeat: { every: '5m' }
         }
       },
-      hooks: {
+          models: {
+        providers: {
+          'google-genai': {
+            apiKey: e.GOOGLE_API_KEY,
+            baseURL: 'https://generativelanguage.googleapis.com/v1beta'
+          }
+        }
+      },
+  hooks: {
         enabled: true,
         token: 'setup-agent-hooks-tok-2026',
         allowRequestSessionKey: true,
