@@ -29,8 +29,8 @@ data:
       },
       agents: {
         defaults: {
-          model: { primary: 'openrouter/meta-llama/llama-3.3-70b-instruct:free' },
-          models: { 'openrouter/meta-llama/llama-3.3-70b-instruct:free': { params: { max_tokens: 4096 } } },
+          model: { primary: 'openrouter/qwen/qwen3-coder:free' },
+          models: { 'openrouter/qwen/qwen3-coder:free': { params: { max_tokens: 4096 } } },
           workspace: '/root/.openclaw/workspace',
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
