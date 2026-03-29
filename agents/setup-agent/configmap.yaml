@@ -44,7 +44,7 @@ data:
           'google-genai': { apiKey: e.GOOGLE_API_KEY }
         }
       },
-  hooks: {
+      hooks: {
         enabled: true,
         token: 'setup-agent-hooks-tok-2026',
         allowRequestSessionKey: true,
