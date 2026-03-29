@@ -29,8 +29,8 @@ data:
       },
       agents: {
         defaults: {
-          model: { primary: 'openrouter/openai/gpt-oss-20b:free' },
-          models: { 'openrouter/openai/gpt-oss-20b:free': { params: { max_tokens: 4096 } } },
+          model: { primary: 'openrouter/google/gemma-3-27b-it:free' },
+          models: { 'openrouter/google/gemma-3-27b-it:free': { params: { max_tokens: 4096 } } },
           workspace: '/root/.openclaw/workspace',
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
