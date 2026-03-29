@@ -17,7 +17,9 @@ data:
     fs.mkdirSync('/root/.openclaw/workspace/credentials', { recursive: true });
     fs.mkdirSync('/root/.openclaw/agents/main/agent', { recursive: true });
     
-    // Write openclaw.json — use OpenRouter to avoid Anthropic OAuth expiry issues
+    // Write openclaw.json — provider names must match model ID prefixes
+    // OpenClaw resolves 'openai/gpt-4o-mini' → looks for providers.openai
+    const orKey = e.OPENROUTER_API_KEY || '';
     const config = {
       gateway: {
         port: 18789,
@@ -27,10 +29,27 @@ data:
         tools: { allow: ['sessions_spawn','sessions_send','sessions_list','sessions_history','session_status','cron','exec','web_fetch'] },
         controlUi: { dangerouslyAllowHostHeaderOriginFallback: true }
       },
+      models: {
+        providers: {
+          openai: {
+            baseUrl: 'https://openrouter.ai/api/v1',
+            apiKey: orKey,
+            models: [
+              { id: 'openai/gpt-4o-mini', name: 'gpt-4o-mini', api: 'openai-completions', reasoning: false, input: ['text','image'], cost: { input: 0.15, output: 0.6 }, contextWindow: 128000, maxTokens: 16384 }
+            ]
+          },
+          anthropic: {
+            baseUrl: 'https://openrouter.ai/api/v1',
+            apiKey: orKey,
+            models: [
+              { id: 'anthropic/claude-sonnet-4-6', name: 'claude-sonnet-4-6', api: 'openai-completions', reasoning: false, input: ['text','image'], cost: { input: 3, output: 15 }, contextWindow: 200000, maxTokens: 16384 }
+            ]
+          }
+        }
+      },
       agents: {
         defaults: {
-          model: { primary: 'openrouter/google/gemma-3-27b-it:free' },
-          models: { 'openrouter/google/gemma-3-27b-it:free': { params: { max_tokens: 4096 } } },
+          model: { primary: 'openai/gpt-4o-mini' },
           workspace: '/root/.openclaw/workspace',
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
@@ -50,23 +69,8 @@ data:
     };
     fs.writeFileSync('/root/.openclaw/openclaw.json', JSON.stringify(config, null, 2));
     
-    // Write auth-profiles.json - Anthropic direct (OAuth valid ~1yr) + OpenRouter fallback
-    const authProfiles = {
-      version: 1,
-      profiles: {
-        "anthropic:default": {
-          type: "token",
-          provider: "anthropic",
-          token: e.ANTHROPIC_API_KEY
-        },
-        "openrouter:default": {
-          type: "token",
-          provider: "openrouter",
-          token: e.OPENROUTER_API_KEY
-        }
-      }
-    };
-    fs.writeFileSync('/root/.openclaw/agents/main/agent/auth-profiles.json', JSON.stringify(authProfiles, null, 2));
+    // Clean stale auth-profiles that might override provider config
+    try { fs.unlinkSync('/root/.openclaw/agents/main/agent/auth-profiles.json'); } catch(e) {}
     // Remove stale models.json so OpenClaw picks up the new config
     try { fs.unlinkSync('/root/.openclaw/agents/main/agent/models.json'); } catch(e) {}
     

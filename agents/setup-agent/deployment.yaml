@@ -19,7 +19,7 @@ spec:
         app: setup-agent
         role: worker
       annotations:
-        config/restart-trigger: "2026-03-29-llama32-3b-free-model"
+        config/restart-trigger: "2026-03-30-gpt4o-mini-tool-fix"
     spec:
       serviceAccountName: setup-agent
       initContainers:
