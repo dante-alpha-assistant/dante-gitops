@@ -257,7 +257,20 @@ spec:
           \ = existing.lastGood || {};\n  existing.lastGood.anthropic = 'anthropic:default';\n\
           \  fs.writeFileSync(authPath, JSON.stringify(existing, null, 2));\n  console.log('auth-profiles.json\
           \ written from ANTHROPIC_API_KEY');\n}\nconsole.log('Config + HEARTBEAT.md\
-          \ + SOUL.md + coding-task skill written OK');\n"
+          \ + SOUL.md + coding-task skill written OK');\n\
+          \n// --- Install codex-conductor skill from ClawHub ---\n\
+          const { execSync } = require('child_process');\n\
+          const codexConductorDir = '/root/.openclaw/workspace/skills/codex-conductor';\n\
+          if (!fs.existsSync(codexConductorDir + '/SKILL.md')) {\n\
+          \  try {\n\
+          \    execSync('npx clawhub install codex-conductor', { stdio: 'inherit', timeout: 60000 });\n\
+          \    console.log('codex-conductor skill installed OK');\n\
+          \  } catch(e) {\n\
+          \    console.error('codex-conductor install failed:', e.message);\n\
+          \  }\n\
+          } else {\n\
+          \  console.log('codex-conductor skill already present');\n\
+          }\n"
         envFrom:
         - secretRef:
             name: neo-worker-env
