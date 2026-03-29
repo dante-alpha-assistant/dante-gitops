@@ -7,7 +7,7 @@ metadata:
     app: setup-agent
     role: worker
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
   selector:
@@ -19,7 +19,7 @@ spec:
         app: setup-agent
         role: worker
       annotations:
-        config/restart-trigger: "2026-03-18-kimi-model"
+        config/restart-trigger: "2026-03-29-single-replica-rate-limit-fix"
     spec:
       serviceAccountName: setup-agent
       initContainers:
