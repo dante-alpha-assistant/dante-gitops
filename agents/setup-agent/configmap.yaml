@@ -39,12 +39,9 @@ data:
           heartbeat: { every: '5m' }
         }
       },
-          models: {
+      models: {
         providers: {
-          'google-genai': {
-            apiKey: e.GOOGLE_API_KEY,
-            baseURL: 'https://generativelanguage.googleapis.com/v1beta'
-          }
+          'google-genai': { apiKey: e.GOOGLE_API_KEY }
         }
       },
   hooks: {
