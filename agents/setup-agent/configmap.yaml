@@ -29,8 +29,8 @@ data:
       },
       agents: {
         defaults: {
-          model: { primary: 'openrouter/nvidia/nemotron-3-super-120b-a12b:free' },
-          models: { 'openrouter/nvidia/nemotron-3-super-120b-a12b:free': { params: { max_tokens: 4096 } } },
+          model: { primary: 'meta-llama/llama-3.2-3b-instruct:free' },
+          models: { 'meta-llama/llama-3.2-3b-instruct:free': { params: { max_tokens: 4096 } } },
           workspace: '/root/.openclaw/workspace',
           compaction: { mode: 'safeguard' },
           maxConcurrent: 8,
