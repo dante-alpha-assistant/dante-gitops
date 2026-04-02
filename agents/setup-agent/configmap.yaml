@@ -35,14 +35,14 @@ data:
             baseUrl: 'https://openrouter.ai/api/v1',
             apiKey: orKey,
             models: [
-              { id: 'openai/gpt-4o-mini', name: 'gpt-4o-mini', api: 'openai-completions', reasoning: false, input: ['text','image'], cost: { input: 0.15, output: 0.6 }, contextWindow: 128000, maxTokens: 16384 }
+              { id: 'openai/gpt-4o-mini', name: 'gpt-4o-mini', api: 'openai-completions', reasoning: false, input: ['text','image'], cost: { input: 0.15, output: 0.6 }, contextWindow: 128000, maxTokens: 8192 }
             ]
           },
           anthropic: {
             baseUrl: 'https://openrouter.ai/api/v1',
             apiKey: orKey,
             models: [
-              { id: 'anthropic/claude-sonnet-4-6', name: 'claude-sonnet-4-6', api: 'openai-completions', reasoning: false, input: ['text','image'], cost: { input: 3, output: 15 }, contextWindow: 200000, maxTokens: 16384 }
+              { id: 'anthropic/claude-sonnet-4-6', name: 'claude-sonnet-4-6', api: 'openai-completions', reasoning: false, input: ['text','image'], cost: { input: 3, output: 15 }, contextWindow: 200000, maxTokens: 8192 }
             ]
           }
         }
