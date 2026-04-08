@@ -78,6 +78,11 @@ spec:
                 secretKeyRef:
                   name: task-dispatcher-env
                   key: GH_TOKEN
+            - name: VERCEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: task-dispatcher-env
+                  key: VERCEL_TOKEN
             - name: LANGFUSE_BASE_URL
               value: "https://cloud.langfuse.com"
             - name: ARGOCD_URL
